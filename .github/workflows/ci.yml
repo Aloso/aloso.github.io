@@ -1,0 +1,25 @@
+name: CI
+on:
+  push:
+    branches:
+    - main
+
+jobs:
+  CI:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-ruby@v1
+      with:
+        ruby-version: '2.7'
+
+    - run: bundle install && bundle exec jekyll build
+
+    - name: Deploy
+      uses: peaceiris/actions-gh-pages@3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: main
+        publish_dir: _site
+        force_orphan: true
