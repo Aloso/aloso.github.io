@@ -1,0 +1,206 @@
+---
+layout: default
+title: Creating an Iterator in Rust
+show_meta: true
+date: 2021-03-09
+excerpt_separator: // END OF EXCERPT
+---
+
+When I woke up today, I thought, what a great day to start a blog! So here we are. Before we take off, just a short introduction: I'm Ludwig, I'm a CS student from Germany, and I love Rust. Since this blog is about Rust, I hope you do too!
+
+This post is about a core concept in Rust, iterators. If you don't know what iterators are, please read https://doc.rust-lang.org/book/ch13-02-iterators.html[the chapter about iterators] in the Rust book first.
+
+// END OF EXCERPT
+
+== The collection type
+
+Iterators usually iterate over some sort of collection. Our collection type is a tree:
+
+[source,rust]
+----
+enum Node<Item> {
+    Leaf(Item),
+    Children(Vec<Node<Item>>),
+}
+----
+
+Simple, right? A tree node is either a `Leaf`, in which case it contains an `Item`, or a list of child nodes.
+
+== A `traverse` method
+
+We want to traverse (i.e. iterate over) this kind of tree _depth-first_. This means that when a node has multiple children, we first traverse the first child _and all its descendants_ before moving on to the second child. This is easy to implement with a recursive algorithm:
+
+[source, rust]
+----
+impl<It> Node<It> {
+    fn traverse(&self) {
+        match self {
+            Node::Leaf(_) => {}
+            Node::Children(children) => {
+                for node in children {
+                    node.traverse();
+                }
+            }
+        }
+    }
+}
+----
+
+If we want to do something with each item, we can pass a closure to the function:
+
+[source, rust]
+----
+impl<It> Node<It> {
+    fn traverse(&self, f: impl Fn(&It) + Clone) {
+        match self {
+            Node::Leaf(item) => {
+                f(item);
+            }
+            Node::Children(children) => {
+                for node in children {
+                    node.traverse(f.clone());
+                }
+            }
+        }
+    }
+}
+----
+
+This allows us to iterate over the items. However, `Tree` still doesn't implement the `Iterator` trait, which would be useful because it provides helper methods such as `filter`, `fold` and `collect`.
+
+As we will see shortly, implementing this trait is quite tricky in this case. The reason for this is that the `Iterator` trait provides _external iteration_, whereas our `traverse` method provides _internal iteration_.
+
+[.hint]
+.External and internal iteration
+--
+Internal iteration means that a closure is passed to a function, which calls the closure for every element. This means that the iterator function has full control over the iteration.
+
+External iteration on the other hand means that there's a struct with a method to get the next element. This means that the code _using_ the iterator controls the iteration. It can pause the iteration, do something else, pass the iterator to another function and maybe resume it later. External iteration is therefore very powerful and flexible.
+--
+
+== Implementing the `Iterator` trait
+
+To be able to _externally_ iterate over the tree, we need to implement the `Iterator` trait. It looks roughly like this:
+
+[source, rust]
+----
+trait Iterator {
+    type Item;
+
+    fn next(&mut self) -> Option<Self::Item>;
+}
+----
+
+The iterator trait is usually not implemented for a collection _directly_. Instead, a _new type_ is created that wraps the collection:
+
+[source, rust]
+----
+struct NodeIter<'a, It>(&'a Tree<It>);
+----
+
+As the immutable reference indicates, this struct can only iterate over immutable references of the items. To get an instance of this type, we add a `.iter()` method:
+
+[source, rust]
+----
+impl<It> Node<It> {
+    fn iter(&self) -> NodeIter<'_, It> {
+        NodeIter(self)
+    }
+}
+----
+
+Now we can start with the actual implementation!
+
+[source, rust]
+----
+impl<'a, It> Iterator for NodeIter<'a, It> {
+    type Item = &'a It;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!()
+    }
+}
+----
+
+Now there's a problem: Since `Iterator` provides external iteration, we have to produce one item at a time. This means that we can't use the simple recursive algorithm we used in the `traverse` method. Instead, we have to keep track of the state of the iterator manually:
+
+[source, rust]
+----
+struct NodeIter<'a, It> {
+    children: &'a [Node<It>],
+    parent: Option<Box<NodeIter<'a, It>>>,
+}
+----
+
+The `children` field contains the remaining children of a node, the `parent` field is the iterator of the parent node, if present. It must be wrapped in a `Box` because a struct in Rust can't contain itself without indirection – otherwise, it would be impossible to compute its size on the stack.
+
+So how does this work? When we create the iterator, we put the node into the `children` slice and set `parent` to `None`:
+
+[source, rust]
+----
+impl<It> Node<It> {
+    fn iter(&self) -> NodeIter<'_, It> {
+        NodeIter {
+            children: std::slice::from_ref(self),
+            parent: None,
+        }
+    }
+}
+----
+
+When the iterator is advanced, we first check if `children` is empty. If that's the case, we try to continue iterating the parent node. If there is no parent node, we return `None`.
+
+If `children` is not empty, we remove the first child and check its variant. If it is a `Node::Leaf`, we return its content; if it is a `Node::Children`, we create a new iterator for the children. The `parent` field is set to `self`, and `self` is replaced with the newly created iterator:
+
+[source, rust]
+----
+use std::mem;
+
+impl<'a, It> Iterator for NodeIter<'a, It> {
+    type Item = &'a It;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.children.get(0) {
+            None => match self.parent.take() {
+                Some(parent) => {
+                    // continue with the parent node
+                    *self = *parent;
+                    self.next()
+                }
+                None => None,
+            },
+            Some(Node::Leaf(item)) => {
+                self.children = &self.children[1..];
+                Some(item)
+            }
+            Some(Node::Children(children)) => {
+                self.children = &self.children[1..];
+
+                // start iterating the child trees
+                *self = NodeIter {
+                    children: children.as_slice(),
+                    parent: Some(Box::new(mem::take(self))),
+                };
+                self.next()
+            }
+        }
+    }
+}
+----
+
+This doesn't work yet, because https://doc.rust-lang.org/std/mem/fn.take.html[`mem::take()`] requires that `NodeIter` implements `Default`. But this can be fixed easily:
+
+[source, rust]
+----
+impl<It> Default for NodeIter<'_, It> {
+    fn default() -> Self {
+        NodeIter { children: &[], parent: None }
+    }
+}
+----
+
+[.hint]
+.The `mem::take()` function
+--
+https://doc.rust-lang.org/std/mem/fn.take.html[`mem::take()`] replaces a mutable reference with its default value and returns the previous value. The previous value is effectively _moved out_ of the reference. We use it here to convert `&mut self` to an owned value, because `parent` must be owned.
+--

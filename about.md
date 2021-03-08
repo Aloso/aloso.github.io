@@ -1,0 +1,8 @@
+---
+layout: default
+title: About me
+---
+
+Hi! I'm Ludwig. I live in Germany and am studying Computer Science. On this blog I write about many things, mostly about Rust.
+
+You can reach out to me via [email](mailto:ludwig.stecher@gmx.de).

@@ -1,1 +1,10 @@
-theme: jekyll-theme-minimal
+highlighter: rouge
+
+asciidoctor:
+  attributes:
+  - idprefix=_
+  - source-highlighter=rouge
+
+plugins:
+  - jekyll-asciidoc
+  - jekyll-time-to-read
