@@ -302,7 +302,7 @@ fn test_borrowing_for_loop() {
 }
 ----
 
-And... it compiles!
+And... it compiles! 🎉
 
 === An owned iterator
 

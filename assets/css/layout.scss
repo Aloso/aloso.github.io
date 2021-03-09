@@ -3,6 +3,14 @@
 
 @import url(syntax.css);
 
+html, body {
+    margin: 0;
+    font-size: 18px;
+    background-color: #171717;
+    color: white;
+    font-family: 'Nunito Sans', 'Noto Sans', 'Open Sans', 'Arial', sans-serif;
+}
+
 pre, code {
     font-family: 'JetBrains Mono', 'Hack', 'Consolas', monospace;
 }
@@ -35,14 +43,6 @@ pre > code {
 ::selection {
     background-color: rgba(21, 83, 255, 0.45);
     color: inherit;
-}
-
-html, body {
-    margin: 0;
-    font-size: 18px;
-    background-color: #171717;
-    color: white;
-    font-family: 'Nunito Sans', 'Noto Sans', 'Open Sans', 'Arial', sans-serif;
 }
 
 a {
@@ -238,4 +238,14 @@ ul li > p,
 .hint ul li > p {
   margin-top: 0;
   margin-bottom: 0;
+}
+
+@media (max-width: 650px) {
+    html, body {
+        font-size: 16px;
+    }
+
+    #toc ul ul {
+        display: none;
+    }
 }
