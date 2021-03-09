@@ -255,4 +255,10 @@ ul li > p,
     html, body {
         font-size: 15px;
     }
+
+    pre {
+        margin-left: -1rem;
+        margin-right: -1rem;
+        border-radius: 0;
+    }
 }
