@@ -206,7 +206,7 @@ h5 {
         margin: 1.2rem 0;
     }
 
-    .title:first-child {
+    > .title:first-child, > p:first-child {
         margin-top: 0;
     }
 

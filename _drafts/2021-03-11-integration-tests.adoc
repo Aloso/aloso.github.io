@@ -1,0 +1,82 @@
+---
+layout: default
+title: Integration Tests in Rust
+show_meta: true
+date: 2021-03-11
+author: Ludwig Stecher
+excerpt_separator: // END OF EXCERPT
+---
+
+This will be a shorter post about an interesting solution for a problem I ran into recently.
+
+There are two ways to create tests in Rust: By annotating a function within the binary or library with `#[test]`, or by creating separate test binaries. These are sometimes referred to as _unit tests_ and _integration tests_, respectively.
+
+While unit tests have the advantage that they are simpler to create, integration tests use the same API as other crates that depend on your library. This means that integration tests can give us an intuition how easy it is to use our library. Also, when writing an integration test, we will also notice if we forgot to publicly export an important item.
+
+// END OF EXCERPT
+
+== The problem
+
+Sometimes, we want to enable some piece of code only in tests. This is easy to do in unit tests with `#[cfg(test)]`. However, `cfg(test)` is not set when using the crate from an integration test. This is not a bug, because integration tests are separate crates and depend on the library like any other crate. This means that `cfg(test)` is set in the integration test, but not in the library we are testing.
+
+== Adding a cargo feature
+
+The solution is to expose the functionality as a cargo feature. This is done by adding the following to the `Cargo.toml` file:
+
+[source, toml]
+----
+[features]
+test_feat = []
+----
+
+You can use any name for the feature, probably there's a more descriptive name for what the feature does.
+
+Now we need to replace `cfg(test)` everywhere with `cfg(any(test, feature = "test_feat"))`. The feature also needs to be passed to `cargo test`:
+
+[source, sh]
+----
+> cargo test --test=int_test --features=test_feat
+----
+
+== Another problem
+
+This kind of solves the problem, but it is less than optimal: If we forget to pass the `--features=test_feat` flag, the test fails with an unrelated error message. The fix (adding the mentioned flag) is non-obvious.
+
+To solve this problem, cargo has _required features_. To set the required features of the test, we first need to define the integration test in our `Cargo.toml` file. Cargo usually infers the necessary information of integration tests from the directory structure, but this time we have to specify it explicitly, for example:
+
+[source, toml]
+----
+[[test]]
+name = "int_test"
+path = "tests/int_test/main.rs"
+required-features = ["test_feat"]
+----
+
+The `required-features` entry ensures that cargo shows an error when we try to run this test without the required feature. We still get an error if we forget to pass the `--features=test_feat` flag, but the error message is much better than before, so the problem is easy to identify!
+
+== Can we do better?
+
+Ideally, the feature should just be enabled automatically when running `cargo test --all`. Is that possible? https://github.com/rust-lang/cargo/issues/4663[This long-standing issue] seems to suggest that it isn't. Too bad. But wait! What if we enabled the feature by depending on our own crate in the `dev-dependencies`?
+
+[source, toml]
+----
+[dev-dependencies]
+# `crazy_crate` is the name of our crate
+crazy_crate = { version = "*", path = ".", features = ["test_feat"] }
+----
+
+=== How does this work?
+
+When cargo resolves dependencies, it creates a crate graph, which is a _DAG_ (directed acyclic graph). This means that there can't be cyclic dependencies: If A depends on B and B depends on A, cargo complains.
+
+In this case a crate depends on itself, which is also a cyclic dependency. However, for some reason cargo allows it. I kind of understand why this is okay, but I don't know enough about cargo to properly explain it. 😕
+
+So is the crate compiled twice? No. Cargo considers features to be _additive_, which means that adding a feature never breaks your code. So when a crate is depended on multiple times, but the dependencies have compatible versions, the crate is built only once, with the _unification_ of all the needed features.
+
+That's also what happens here: When we run `cargo test --all`, our crate is compiled once, with the `test_feat` feature, and our integration Just Works. 🎉
+
+== Should I do this?
+
+++++
+Since the reflexive dependency <s>is only used in test and examples</s>
+++++

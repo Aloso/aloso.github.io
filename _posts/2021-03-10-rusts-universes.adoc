@@ -1,0 +1,172 @@
+---
+layout: default
+title: Rusts Universes
+show_meta: true
+date: 2021-03-10
+author: Ludwig Stecher
+---
+
+This post describes a curious feature of Rust: Namespaces, also called universes. Note that Rusts namespaces are nothing like namespaces in languages such as TypeScript or C♯; they are also unrelated to all of space and time, although there are certainly _parallels_.
+
+== Identifiers
+
+To understand namespaces, we first need to talk about names. Namespaces contain all the names (called _identifiers_) in Rust code. This does not include keywords, but it includes the names of local variables, types, traits, functions, modules, generic arguments, macros, and so on.
+
+Every identifier has a certain scope. For example, local variables are scoped to the block they were defined in, free functions are scoped to their module, trait methods are scoped to their trait, inherent methods to their type. Etcetera. It's not possible to use an identifier outside of its scope, unless it was brought into scope with a `use` statement. So far so good.
+
+But what happens when a scope contains multiple things with the same name? Now it gets complicated. In most cases, you'll get a compiler error. An exception are local variables and macros, which use _textual scoping_, and therefore allow _shadowing_ things with the same name:
+
+[source, rust]
+----
+let x = 5;
+let x = "hello world!";  // no problemo!
+
+macro_rules! x {
+    ($e:expr) => {}
+}
+macro_rules! x {  // who cares!
+    () => {}
+}
+----
+
+These are the only exceptions, however. All other things use _path-based scoping_. While local variables and macros have to be declared before they can be used, things with path-based scoping can be declared and used in any order:
+
+[source, rust]
+----
+m!();  // error: m is not defined at this point
+macro_rules! m {
+    () => {}
+}
+
+f();  // this is fine
+fn f() {}
+----
+
+== Namespaces
+
+However, path-scoped things have a limitation: There can't be more than one thing with the same name defined in the same scope _and namespace_. For example:
+
+[source, rust]
+----
+fn wtf() {}
+const wtf: u8 = 0;  // error: the name `wtf` is defined multiple times
+
+mod wtf {}  // this is allowed‽
+----
+
+Why is that? the function `wtf` and the constant `wtf` both live in the same namespace, therefore their names clash. The module `wtf` however lives in a different namespace, so it can coexist with a function or constant of the same name. In other words, it's in a parallel universe.
+
+Note that constants are usually written in UPPER_CASE, so functions and constants can't clash in idiomatic code. I wrote the above code just to prove a point, please don't quote me on it. 😉
+
+So you're probably wondering, how many namespaces are there? Let's look in the https://archive.is/ajZHM[documentation of the rustc source]! There are 3:
+
+- The _type namespace_
+- The _value namespace_
+- The _macro namespace_
+
+Which items are part of which namespace is specified https://archive.is/OZM8P[here] in the `DefKind` type:
+
+- The _type namespace_ contains
+    * modules
+    * structs
+    * enums
+    * unions
+    * enum variants
+    * traits
+    * type aliases
+    * foreign types
+    * trait aliases (currently unstable)
+    * associated types
+    * type parameters
+- The _value namespace_ contains
+    * functions
+    * constants
+    * `const` parameters
+    * statics
+    * constructors
+    * associated functions
+    * associated constants
+- The _macro namespace_ just contains macros.
+
+All other names are treated specially and don't fall into any of the above categories.
+
+== What does that mean?
+
+Items with the same name can coexist in the same scope, if they are from different namespaces. One example for this are _tuple structs_, because they are desugared (i.e. transformed by the compiler) into a regular struct and a constructor function:
+
+[source, rust]
+----
+struct Foo(Bar);
+
+// the compiler transforms the above into something like this:
+
+struct Foo { 0: Bar };
+
+fn Foo(_0: Bar) -> Foo {
+    Foo { 0: _0 }
+}
+----
+
+[.hint]
+This isn't valid Rust syntax, but that's not a problem for the compiler, because the transformation happens internally, after the code was already parsed.
+
+So this is why tuple structs can be both used as a type and invoked like a function. However, it also means that tuple structs occupy both the type namespace and the value namespace. Roughly the same happens with enum variants with round brackets. Furthermore, unit structs and unit-like enum variants expand to a type name and a value (a constant), so they also occupy both namespaces.
+
+== Resolving names from different namespaces
+
+Rusts syntax is designed to be unambiguous about the namespace in which the names live. It distinguishes between type positions and value positions, for example:
+
+[source, rust]
+----
+fn a(b: C) -> D {
+    e::f::G.h::<I>(j)
+}
+----
+
+Just by looking at the syntax, the compiler can tell that
+
+- `C`, `D`, `e`, `f` and `I` are in the type namespace
+- `a`, `b`, `G`, `h` and `j` are in the value namespace
+
+How does that work? Let's start with the obvious ones: `a` and `h` are functions, and `c` is a local variable, so they must be in the value namespace. `j` is used as a function argument, so it's also a value. `C` and `D` are used in type positions, so they're types. `I` is used as a generic argument, so it's also a type.
+
+That only leaves `e`, `f` and `G`. Since `e` and `f` are immediately followed by two colons (called the _scoping operator_), they must be in the type namespace. That makes sense, because types, traits and modules are in the type namespace. `G` however is followed by a dot, so it is parsed as a value.
+
+[.hint]
+.Note about const generics
+--
+A restricted version of const generics are https://blog.rust-lang.org/2021/02/26/const-generics-mvp-beta.html[about to be released] in stable Rust. This will introduce an ambiguity in the parser: In the expression `foo::<X>()`, the `X` can be both a type and a value.
+
+Rust resolves this ambiguity by preferring the type when there is both a type `X` and a value `X` in scope. If that is incorrect and the function expects a value, it must be wrapped in curly braces, i.e. `foo::<{&nbsp;X&nbsp;}>()`.
+--
+
+== Importing names
+
+Items can be imported with a `use` item. But how are different namespaces handled? Generally, `use` imports items from all three namespaces. This means for example, when importing a tuple struct, both its type and its constructor are available.
+
+There is an exception, however: When a path ends with `::{self}` (the curly braces can contain more paths), only the name from the _type namespace_ is imported. For example:
+
+[source, rust]
+----
+mod module {
+    pub struct Foo();
+}
+
+// import both the type Foo and its constructor:
+use module::Foo;
+
+// import only the type:
+use module::Foo::{self};
+----
+
+Are you confused yet?
+
+== End
+
+I hope you enjoyed this post, even though it's less practically useful than my https://aloso.github.io/2021/03/09/creating-an-iterator.html[previous post].
+
+Discussion on Reddit.
+
+If you have suggestions what topics I should cover next, please file a bug in the https://github.com/Aloso/aloso.github.io/issues[issue tracker]. Also file a bug if you have questions or want some things explained in more detail, or found a mistake.
+
+So long!
