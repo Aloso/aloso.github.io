@@ -14,7 +14,7 @@ jobs:
       with:
         ruby-version: '2.7'
 
-    - run: bundle install && bundle exec jekyll build
+    - run: bundle install && bundle exec jekyll build --verbose
 
     - name: Deploy
       uses: peaceiris/actions-gh-pages@364c31d33bb99327c77b3a5438a83a357a6729ad # v3.4.0

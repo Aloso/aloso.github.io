@@ -1,3 +1,6 @@
+baseurl: ""
+url: "https://aloso.github.io/"
+future: true
 highlighter: rouge
 
 asciidoctor:
@@ -8,3 +11,4 @@ asciidoctor:
 plugins:
   - jekyll-asciidoc
   - jekyll-time-to-read
+  - jekyll-redirect-from
