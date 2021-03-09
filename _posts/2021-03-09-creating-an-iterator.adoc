@@ -99,7 +99,17 @@ The iterator trait is usually not implemented for a collection _directly_. Inste
 struct NodeIter<'a, It>(&'a Tree<It>);
 ----
 
-As the immutable reference indicates, this struct can only iterate over immutable references of the items. To get an instance of this type, we add a `.iter()` method:
+[.hint]
+.Why not implement `Iterator` for the collection?
+--
+This great question was asked recently on Reddit. One reason is, if the collection implemented the `Iterator` type directly, the collection could be modified during iteration, which is is error-prone and usually undesired. It would also make it impossible to have multiple iterators that iterate over the same collection simultaneously and independently from each other, because the `Iterator::next()` method borrows the iterator mutably.
+
+More importantly, though, iterators usually need additional state to keep track of the position of the next item in the collection. This state needs to be updated in every iteration, which doesn't work if the collection is behind an immutable reference and the state is part of the collection.
+
+If the iterator is a separate type, it can be mutable even though the collection is immutable. You'll see how this works in a moment, just read on!
+--
+
+As the immutable reference in the `NodeIter` type indicates, it can only iterate over immutable references of the items. To get an instance of this iterator, we add a `.iter()` method:
 
 [source, rust]
 ----
@@ -224,10 +234,12 @@ fn test_borrowing_iterator() {
             Node::Leaf(2),
             Node::Children(vec![]),
         ]),
-        Node::Children(vec![Node::Children(vec![
-            Node::Children(vec![Node::Leaf(1)]),
-            Node::Leaf(0),
-        ])]),
+        Node::Children(vec![
+            Node::Children(vec![
+                Node::Children(vec![Node::Leaf(1)]),
+                Node::Leaf(0),
+            ]),
+        ]),
     ]);
 
     let nums: Vec<i32> = tree.iter().copied().collect();
@@ -252,9 +264,9 @@ Now that we have a working iterator, let's see how we can improve it. First, let
 
 === Size hint
 
-Every iterator has a size hint, to help the `collect` methods decide how much memory to allocate when collecting into something like a `Vec`. If the size hint is inaccurate, then the `collect` method might have to re-allocate a few times, or it allocates too much, wasting memory.
+Every iterator has a size hint, to help the `collect` methods decide how much memory to allocate when collecting into something like a `Vec`. By default the lower bound of the size hint is 0, so the `collect` method might have to re-allocate a few times. This is still better than setting the size hint too high, because that would waste memory.
 
-Unfortunately, we don't know how many elements a `Node` contains, so we'll skip the `size_hint` method.
+Unfortunately, we don't know how many elements a `Node` contains, and calculating the number of elements would be expensive, so we'll skip the `size_hint` method.
 
 === `FusedIterator`
 

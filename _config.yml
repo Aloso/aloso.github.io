@@ -1,3 +1,5 @@
+title: Aloso's blog
+description: Posts around the Rust programming language
 baseurl: ""
 url: "https://aloso.github.io/"
 future: true
