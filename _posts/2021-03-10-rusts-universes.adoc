@@ -56,6 +56,7 @@ mod wtf {}  // this is allowed‽
 
 Why is that? the function `wtf` and the constant `wtf` both live in the same namespace, therefore their names clash. The module `wtf` however lives in a different namespace, so it can coexist with a function or constant of the same name. In other words, it's in a parallel universe.
 
+[.hint]
 Note that constants are usually written in UPPER_CASE, so functions and constants can't clash in idiomatic code. I wrote the above code just to prove a point, please don't quote me on it. 😉
 
 So you're probably wondering, how many namespaces are there? Let's look in the https://archive.is/ajZHM[documentation of the rustc source]! There are 3:
@@ -165,7 +166,7 @@ Are you confused yet?
 
 I hope you enjoyed this post, even though it's less practically useful than my https://aloso.github.io/2021/03/09/creating-an-iterator.html[previous post].
 
-Discussion on Reddit.
+Discussion on https://www.reddit.com/r/rust/comments/m1iour/rusts_universes/[Reddit].
 
 If you have suggestions what topics I should cover next, please file a bug in the https://github.com/Aloso/aloso.github.io/issues[issue tracker]. Also file a bug if you have questions or want some things explained in more detail, or found a mistake.
 
