@@ -414,7 +414,7 @@ If you got stuck implementing this yourself, you may take a peek at https://play
 
 You should now be able to implement iterators for tree-like data structures.
 
-All code is available in this https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=e08cc46a80ce1e5aa8f83d3e360a28dd[playground]. Discussion on Reddit.
+All code is available in this https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=e08cc46a80ce1e5aa8f83d3e360a28dd[playground]. Discussion on https://www.reddit.com/r/rust/comments/m0wzw7/creating_an_iterator_in_rust/[Reddit].
 
 If you have suggestions what topics I should cover next, please file a bug in the https://github.com/Aloso/aloso.github.io/issues[issue tracker]. Also file a bug if you have questions or want some things explained in more detail, or if you found a mistake.
 
