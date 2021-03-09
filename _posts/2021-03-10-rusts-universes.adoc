@@ -129,7 +129,7 @@ Just by looking at the syntax, the compiler can tell that
 - `C`, `D`, `e`, `f` and `I` are in the type namespace
 - `a`, `b`, `G`, `h` and `j` are in the value namespace
 
-How does that work? Let's start with the obvious ones: `a` and `h` are functions, and `c` is a local variable, so they must be in the value namespace. `j` is used as a function argument, so it's also a value. `C` and `D` are used in type positions, so they're types. `I` is used as a generic argument, so it's also a type.
+How does that work? Let's start with the obvious ones: `a` and `h` are functions, and `b` is a local variable, so they must be in the value namespace. `j` is used as a function argument, so it's also a value. `C` and `D` are used in type positions, so they're types. `I` is used as a generic argument, so it's also a type.
 
 That only leaves `e`, `f` and `G`. Since `e` and `f` are immediately followed by two colons (called the _scoping operator_), they must be in the type namespace. That makes sense, because types, traits and modules are in the type namespace. `G` however is followed by a dot, so it is parsed as a value.
 
