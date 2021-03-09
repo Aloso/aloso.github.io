@@ -3,6 +3,7 @@ layout: default
 title: Creating an Iterator in Rust
 show_meta: true
 date: 2021-03-09
+author: Ludwig Stecher
 excerpt_separator: // END OF EXCERPT
 ---
 
@@ -204,3 +205,217 @@ impl<It> Default for NodeIter<'_, It> {
 --
 https://doc.rust-lang.org/std/mem/fn.take.html[`mem::take()`] replaces a mutable reference with its default value and returns the previous value. The previous value is effectively _moved out_ of the reference. We use it here to convert `&mut self` to an owned value, because `parent` must be owned.
 --
+
+Now let's see if the iterator works!
+
+== Testing
+
+To check if it works, we can write a unit test:
+
+[source, rust]
+----
+#[test]
+fn test_borrowing_iterator() {
+    let tree = Node::Children(vec![
+        Node::Leaf(5),
+        Node::Leaf(4),
+        Node::Children(vec![
+            Node::Leaf(3),
+            Node::Leaf(2),
+            Node::Children(vec![]),
+        ]),
+        Node::Children(vec![Node::Children(vec![
+            Node::Children(vec![Node::Leaf(1)]),
+            Node::Leaf(0),
+        ])]),
+    ]);
+
+    let nums: Vec<i32> = tree.iter().copied().collect();
+    assert_eq!(nums, vec![5, 4, 3, 2, 1, 0]);
+}
+----
+
+[source, sh]
+----
+> cargo test -q
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+----
+
+That looks reassuring!
+
+== Adding features
+
+Now that we have a working iterator, let's see how we can improve it. First, let's check if we can implement more iterator methods to make it more efficient!
+
+=== Size hint
+
+Every iterator has a size hint, to help the `collect` methods decide how much memory to allocate when collecting into something like a `Vec`. If the size hint is inaccurate, then the `collect` method might have to re-allocate a few times, or it allocates too much, wasting memory.
+
+Unfortunately, we don't know how many elements a `Node` contains, so we'll skip the `size_hint` method.
+
+=== `FusedIterator`
+
+Sometimes it's useful to ensure that after the iterator produces `None` for the first time, it will only produce `None` values. Iterators with this property are called _fused iterators_, and any iterator can be converted to a fused iterator with the `.fused()` method.
+
+However, if we implement the `FusedIterator` trait for our iterator, calling the `.fused()` method is more efficient, because it has a specialized implementation for types that implement this trait. So let's add it:
+
+[source, rust]
+----
+use std::iter::FusedIterator;
+
+impl<It> FusedIterator for NodeIter<'_, It> {}
+----
+
+That's it!
+
+=== `IntoIterator`
+
+This trait doesn't make the iterator more efficient, just more ergonomic. Implementing `IntoIterator` for `&Node<T>` makes it possible to use a node in a `for` loop without having to write `.iter()` explicitly:
+
+[source, rust]
+----
+impl<'a, It> IntoIterator for &'a Node<It> {
+    type Item = &'a It;
+
+    type IntoIter = NodeIter<'a, It>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+----
+
+Let's try it out:
+
+[source, rust]
+----
+#[test]
+fn test_borrowing_for_loop() {
+    let tree = Node::Leaf(42);
+
+    for &node in &tree {
+        let _: i32 = node;
+    }
+}
+----
+
+And... it compiles!
+
+=== An owned iterator
+
+We can also implement an iterator that consumes the tree and produces the items as owned values. To implement this iterator, we can copy-paste the borrowed iterator and make a few adjustments:
+
+[source, rust]
+----
+struct NodeIntoIter<It> {
+    // we use a VecDeque because it allows
+    // removing elements from the front efficiently
+    children: VecDeque<Node<It>>,
+    parent: Option<Box<NodeIntoIter<It>>>,
+}
+
+impl<It> Default for NodeIntoIter<It> {
+    fn default() -> Self {
+        NodeIntoIter {
+            children: Default::default(),
+            parent: None,
+        }
+    }
+}
+
+impl<It> Iterator for NodeIntoIter<It> {
+    type Item = It;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.children.pop_front() {
+            None => match self.parent.take() {
+                Some(parent) => {
+                    // continue with the parent node
+                    *self = *parent;
+                    self.next()
+                }
+                None => None,
+            },
+            Some(Node::Leaf(item)) => Some(item),
+            Some(Node::Children(children)) => {
+                // start iterating the child trees
+                *self = NodeIntoIter {
+                    children: children.into(),
+                    parent: Some(Box::new(mem::take(self))),
+                };
+                self.next()
+            }
+        }
+    }
+}
+----
+
+Now let's implement `IntoIterator` for `Node`, so we can use it:
+
+[source, rust]
+----
+impl<It> IntoIterator for Node<It> {
+    type Item = It;
+
+    type IntoIter = NodeIntoIter<It>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let mut children = VecDeque::with_capacity(1);
+        children.push_back(self);
+
+        NodeIntoIter {
+            children,
+            parent: None,
+        }
+    }
+}
+----
+
+Don't forget to test it:
+
+[source, sh]
+----
+> cargo test -q
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+----
+
+=== A mutable iterator
+
+Collections usually also have an iterator for mutating the items. They can be particularly tricky to implement safely, because you have to ensure that no part of the iterator is ever borrowed mutably multiple times.
+
+But because this blog post is already way too long, I leave this part as an exercise to the reader. 😛
+
+[.hint]
+.How to borrow multiple things from a slice mutably?
+--
+Getting multiple mutable references into a slice isn't easy.
+One way is to create a mutable iterator with `.iter_mut()`. Also there's a number of methods to help you out:
+
+- https://doc.rust-lang.org/std/primitive.slice.html#method.split_at_mut[`split_at_mut`]
+- https://doc.rust-lang.org/std/primitive.slice.html#method.split_first_mut[`split_first_mut`]
+- https://doc.rust-lang.org/std/primitive.slice.html#method.split_last_mut[`split_last_mut`]
+- https://doc.rust-lang.org/std/primitive.slice.html#method.split_mut[`split_mut`]
+- https://doc.rust-lang.org/std/primitive.slice.html#method.split_inclusive_mut[`split_inclusive_mut`]
+--
+
+If you got stuck implementing this yourself, you may take a peek at https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=e08cc46a80ce1e5aa8f83d3e360a28dd[this playground].
+
+=== What about `DoubleEndedIterator`?
+
+`DoubleEndedIterator` is a trait implemented by iterators that can consume items from both ends. However, we won't implement this trait for our iterators, because it would make them much more complicated. And who needs that trait anyway? 😉
+
+== Fin
+
+You should now be able to implement iterators for tree-like data structures.
+
+All code is available in this https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=e08cc46a80ce1e5aa8f83d3e360a28dd[playground]. Discussion on Reddit.
+
+If you have suggestions what topics I should cover next, please file a bug in the https://github.com/Aloso/aloso.github.io/issues[issue tracker]. Also file a bug if you have questions or want some things explained in more detail, or if you found a mistake.
+
+I will write posts regularly from now on. If you enjoyed this post, please subscribe to the atom feed (see at the bottom) and share it with your friends! Until next time!

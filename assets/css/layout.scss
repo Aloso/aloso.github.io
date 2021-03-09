@@ -12,7 +12,12 @@ pre {
     border-radius: 0.3rem;
     line-height: 1.5;
     overflow: auto;
+    scrollbar-color: #555 #292929;
 }
+pre:hover {
+    scrollbar-color: #666 #292929;
+}
+
 code {
     padding: 0 0.2em;
     background-color: #ffffff15;
@@ -20,6 +25,7 @@ code {
     font-size: 88%;
     text-shadow: 1px 1px 0 #00000015;
 }
+
 pre > code {
     padding: 0;
     background-color: transparent;
@@ -206,4 +212,30 @@ h5 {
     :last-child {
         margin-bottom: 0;
     }
+}
+
+#toc {
+    font-size: 1.1rem;
+
+    #toc-title {
+        font-size: 1.2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+
+    ul {
+        margin: 0 0 0.2rem 0;
+        padding: 0 0 0 1.2rem;
+    }
+
+    li {
+        list-style-type: square;
+        padding: 0;
+    }
+}
+
+ul li > p,
+.hint ul li > p {
+  margin-top: 0;
+  margin-bottom: 0;
 }
