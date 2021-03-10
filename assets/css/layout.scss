@@ -186,6 +186,14 @@ h5 {
     font-weight: bold;
 }
 
+blockquote {
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0 1rem;
+    border-left: 0.3rem solid rgba(255, 255, 255, 0.3);
+    font-style: italic;
+}
+
 .hint {
     background-color: rgba(100, 185, 20, 0.2);
     padding: 1.2rem 1.4rem;
@@ -206,7 +214,8 @@ h5 {
         margin: 1.2rem 0;
     }
 
-    > .title:first-child, > p:first-child {
+    > .title:first-child, > p:first-child,
+    > .content > .title:first-child, > .content > .paragraph:first-child > p {
         margin-top: 0;
     }
 

@@ -6,7 +6,18 @@ date: 2021-03-10
 author: Ludwig Stecher
 ---
 
-This post describes a curious feature of Rust: Namespaces, also called universes. Note that Rusts namespaces are nothing like namespaces in languages such as TypeScript or C♯; they are also unrelated to all of space and time, although there are certainly _parallels_.
+This post describes a curious feature of Rust: Namespaces, also called universes. Note that Rusts namespaces are nothing like namespaces in languages such as TypeScript or C♯; they are also unrelated to all of space and time, although there are certainly parallels.
+
+[.hint]
+--
+It was pointed out that nobody actually calls them universes. The reason I thought that is the following quote from the https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/enum.Namespace.html[rustc documentation]:
+
+> Different kinds of symbols don’t influence each other.
+>
+> Therefore, they have a separate universe (namespace).
+
+However, this is more of a _figure of speech_ than a proper term. I apologize for the confusion.
+--
 
 == Identifiers
 
@@ -54,7 +65,7 @@ const wtf: u8 = 0;  // error: the name `wtf` is defined multiple times
 mod wtf {}  // this is allowed‽
 ----
 
-Why is that? the function `wtf` and the constant `wtf` both live in the same namespace, therefore their names clash. The module `wtf` however lives in a different namespace, so it can coexist with a function or constant of the same name. In other words, it's in a parallel universe.
+Why is that? the function `wtf` and the constant `wtf` both live in the same namespace, therefore their names clash. The module `wtf` however lives in a different namespace, so it can coexist with a function or constant of the same name. One might say, it's in a parallel universe.
 
 [.hint]
 Note that constants are usually written in UPPER_CASE, so functions and constants can't clash in idiomatic code. I wrote the above code just to prove a point, please don't quote me on it. 😉
