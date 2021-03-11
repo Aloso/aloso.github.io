@@ -1,0 +1,53 @@
+= Writing blog posts in Asciidoc
+
+== Front matter
+
+- Make sure that the date in the front matter matches the date in the file name.
+- Add `show_meta: true` to include publication date, read time and table of contents
+- Add `excerpt_separator: // END OF EXCERPT` to specify where the excerpt should end. If omitted, the excerpt is the first paragraph.
+
+== Pages that aren't posts
+
+Theses pages go in the root directory. They must also be mentioned in the `_data/navigation.yml` file if they should appear in the header.
+
+== Markup
+
+=== Green boxes
+
+[source, adoc]
+-----
+[.hint]
+.A title
+--
+A block with the `hint` CSS class
+--
+-----
+
+[.hint]
+.A title
+--
+A block with the `hint` CSS class
+--
+
+=== Code blocks containing markup, links, footnotes, etc.
+
+Note that closing `]` must be escaped in some cases:
+
+[source, adoc]
+-----
+[source, rust, subs="macros+,+quotes"]
+----
+fn contains_markup(v: pass:n[https://doc.rust-lang.org/std/vec/struct.Vec.html[Vec\]]<i32>) {
+    // pass:n[*important*] comment
+    pass:n[[.c\]#//# footnote:[some text https://aloso.github.io[link text\] more text\]]
+}
+----
+-----
+
+[source, rust, subs="macros+,+quotes"]
+----
+fn contains_markup(v: pass:n[https://doc.rust-lang.org/std/vec/struct.Vec.html[Vec\]]<i32>) {
+    // pass:n[*important*] comment
+    pass:n[[.c\]#//# footnote:[some text https://aloso.github.io[link text\] more text\]]
+}
+----

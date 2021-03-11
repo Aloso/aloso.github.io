@@ -7,14 +7,6 @@ author: Ludwig Stecher
 excerpt_separator: // END OF EXCERPT
 ---
 
-// Note: To add a footnote in a code block, add
-//
-// pass:n[[.c\]#//# footnote:[some text some text https://www.reddit.com/user/stxxlmm/[link text\] more text\]]
-//
-// in the code block. The code block must be changed to
-//
-// [source, rust, subs=macros+,"quotes+"]
-
 When I woke up today, I thought, what a great day to start a blog! So here we are. Before we take off, just a short introduction: I'm Ludwig, I'm a CS student from Germany, and I love Rust. Since this blog is about Rust, I hope you do too!
 
 This post is about a core concept in Rust, iterators. If you don't know what iterators are, please read https://doc.rust-lang.org/book/ch13-02-iterators.html[the chapter about iterators] in the Rust book first.
@@ -328,7 +320,7 @@ And... it compiles! 🎉
 
 We can also implement an iterator that consumes the tree and produces the items as owned values. To implement this iterator, we can copy-paste the borrowed iterator and make a few adjustments:
 
-[source, rust, subs=macros+,"quotes+"]
+[source, rust, subs="macros+,quotes+"]
 ----
 struct NodeIntoIter<It> {
     // we use a VecDeque because it allows

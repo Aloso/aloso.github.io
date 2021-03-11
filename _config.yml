@@ -5,6 +5,10 @@ url: "https://aloso.github.io/"
 future: true
 highlighter: rouge
 
+exclude:
+  - README.adoc
+  - Gemfile
+
 asciidoctor:
   attributes:
   - idprefix=_
