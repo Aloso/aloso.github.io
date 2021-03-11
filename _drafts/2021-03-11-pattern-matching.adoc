@@ -1,23 +1,13 @@
 ---
 layout: default
-title: Creating an Iterator in Rust
+title: A Rustacean's Guide to Pattern Matching
 show_meta: true
-date: 2021-03-09
+date: 2021-03-11
 author: Ludwig Stecher
 excerpt_separator: // END OF EXCERPT
 ---
 
-// Note: To add a footnote in a code block, add
-//
-// pass:n[[.c\]#//# footnote:[some text some text https://www.reddit.com/user/stxxlmm/[link text\] more text\]]
-//
-// in the code block. The code block must be changed to
-//
-// [source, rust, subs=macros+,"quotes+"]
-
-When I woke up today, I thought, what a great day to start a blog! So here we are. Before we take off, just a short introduction: I'm Ludwig, I'm a CS student from Germany, and I love Rust. Since this blog is about Rust, I hope you do too!
-
-This post is about a core concept in Rust, iterators. If you don't know what iterators are, please read https://doc.rust-lang.org/book/ch13-02-iterators.html[the chapter about iterators] in the Rust book first.
+Have you ever wondered why the `if let` syntax in Rust looks the way it does? Or what the `ref` keyword is used for?
 
 // END OF EXCERPT
 
@@ -60,14 +50,14 @@ If we want to do something with each item, we can pass a closure to the function
 [source, rust]
 ----
 impl<It> Node<It> {
-    fn traverse(&self, f: impl Fn(&It)) {
+    fn traverse(&self, f: impl Fn(&It) + Clone) {
         match self {
             Node::Leaf(item) => {
                 f(item);
             }
             Node::Children(children) => {
                 for node in children {
-                    node.traverse(&f);
+                    node.traverse(f.clone());
                 }
             }
         }
@@ -328,11 +318,11 @@ And... it compiles! 🎉
 
 We can also implement an iterator that consumes the tree and produces the items as owned values. To implement this iterator, we can copy-paste the borrowed iterator and make a few adjustments:
 
-[source, rust, subs=macros+,"quotes+"]
+[source, rust]
 ----
 struct NodeIntoIter<It> {
     // we use a VecDeque because it allows
-    // removing elements from the front efficiently pass:n[footnote:[I was told that you can use a `std::vec::IntoIter` instead of a `VecDeque`, which is more efficient, and also more idiomatic. In the same way, a `std::slice::Iter` can be used for the reference iterator.\]]
+    // removing elements from the front efficiently
     children: VecDeque<Node<It>>,
     parent: Option<Box<NodeIntoIter<It>>>,
 }
@@ -424,7 +414,7 @@ One way is to create a mutable iterator with `.iter_mut()`. Also there's a numbe
 - https://doc.rust-lang.org/std/primitive.slice.html#method.split_inclusive_mut[`split_inclusive_mut`]
 --
 
-If you got stuck implementing this yourself, you may take a peek at https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=936a02346b3a6703d67bf1de9f8d4cd8[this playground].
+If you got stuck implementing this yourself, you may take a peek at https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=e08cc46a80ce1e5aa8f83d3e360a28dd[this playground].
 
 === What about `DoubleEndedIterator`?
 
@@ -434,7 +424,7 @@ If you got stuck implementing this yourself, you may take a peek at https://play
 
 You should now be able to implement iterators for tree-like data structures.
 
-All code is available in this https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=936a02346b3a6703d67bf1de9f8d4cd8[playground]. Discussion on https://www.reddit.com/r/rust/comments/m0wzw7/creating_an_iterator_in_rust/[Reddit].
+All code is available in this https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=e08cc46a80ce1e5aa8f83d3e360a28dd[playground]. Discussion on https://www.reddit.com/r/rust/comments/m0wzw7/creating_an_iterator_in_rust/[Reddit].
 
 If you have suggestions what topics I should cover next, please file a bug in the https://github.com/Aloso/aloso.github.io/issues[issue tracker]. Also file a bug if you have questions or want some things explained in more detail, or if you found a mistake.
 

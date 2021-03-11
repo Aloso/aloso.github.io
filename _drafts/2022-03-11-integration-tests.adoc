@@ -2,7 +2,7 @@
 layout: default
 title: Integration Tests in Rust
 show_meta: true
-date: 2021-03-11
+date: 2022-03-11
 author: Ludwig Stecher
 excerpt_separator: // END OF EXCERPT
 ---

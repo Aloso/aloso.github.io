@@ -250,6 +250,41 @@ ul li > p,
   margin-bottom: 0;
 }
 
+#footnotes {
+    margin: 3rem 0 1rem 0;
+    font-size: 1.1rem;
+
+    hr {
+        border: none;
+        border-top: 1px solid #555;
+        margin-bottom: 0.5rem;
+
+        &::after {
+            content: "Footnotes";
+            color: white;
+            display: block;
+            margin: 0.5rem 0;
+            font-weight: bold;
+        }
+    }
+
+    .footnote {
+        padding-left: 2.2rem;
+
+        > a:first-child {
+            font-weight: bold;
+            margin-left: -2.2rem;
+            font-family: 'JetBrains Mono', 'Hack', 'Consolas', monospace;
+            padding: 0.2rem 0;
+
+            &::before {
+                content: "↑";
+                padding: 0 0.2rem;
+            }
+        }
+    }
+}
+
 @media (max-width: 700px) {
     html, body {
         font-size: 16px;
