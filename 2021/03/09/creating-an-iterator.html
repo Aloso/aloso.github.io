@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Nunito+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/layout.css?d41d8cd98f00b204e9800998ecf8427e">
+    <title>Creating an Iterator in Rust</title>
+
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/fav/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/fav/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/fav/favicon-16x16.png">
+    <link rel="manifest" href="/assets/fav/site.webmanifest">
+    <link rel="mask-icon" href="/assets/fav/safari-pinned-tab.svg" color="#f88e00">
+    <link rel="shortcut icon" href="/assets/fav/favicon.ico">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-config" content="/assets/fav/browserconfig.xml">
+    <meta name="theme-color" content="#ffffff">
+</head>
+
+<body>
+    <div id="nav">
+    <div id="nav-inner">
+        
+            
+
+            
+                <a id="home" href="/">Aloso's blog</a>
+            
+        
+            
+
+            
+                <a href="/about">About</a>
+            
+        
+    </div>
+</div>
+
+    <div id="main">
+        <div id="main-inner">
+            <h1>Creating an Iterator in Rust</h1>
+            
+            <div id="meta">
+                09 Mar 2021
+                <span class="bullet"></span>
+                18 minutes read
+            </div>
+            
+
+            
+            <div id="toc">
+                <div id="toc-title">Table of Contents</div>
+                <ul class="sectlevel1">
+<li><a href="#_the-collection-type">The collection type</a></li>
+<li><a href="#_a-traverse-method">A <code>traverse</code> method</a></li>
+<li><a href="#_implementing-the-iterator-trait">Implementing the <code>Iterator</code> trait</a></li>
+<li><a href="#_testing">Testing</a></li>
+<li><a href="#_adding-features">Adding features</a>
+<ul class="sectlevel2">
+<li><a href="#_size-hint">Size hint</a></li>
+<li><a href="#_fusediterator"><code>FusedIterator</code></a></li>
+<li><a href="#_intoiterator"><code>IntoIterator</code></a></li>
+<li><a href="#_an-owned-iterator">An owned iterator</a></li>
+<li><a href="#_a-mutable-iterator">A mutable iterator</a></li>
+<li><a href="#_what-about-doubleendediterator">What about <code>DoubleEndedIterator</code>?</a></li>
+</ul>
+</li>
+<li><a href="#_fin">Fin</a></li>
+</ul>
+            </div>
+            
+
+            <div class="paragraph">
+<p>When I woke up today, I thought, what a great day to start a blog! So here we are. Before we take off, just a short introduction: I&#8217;m Ludwig, I&#8217;m a CS student from Germany, and I love Rust. Since this blog is about Rust, I hope you do too!</p>
+</div>
+<div class="paragraph">
+<p>This post is about a core concept in Rust, iterators. If you don&#8217;t know what iterators are, please read <a href="https://doc.rust-lang.org/book/ch13-02-iterators.html">the chapter about iterators</a> in the Rust book first.</p>
+</div>
+<div class="sect1">
+<h2 id="_the-collection-type">The collection type</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Iterators usually iterate over some sort of collection. Our collection type is a tree:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">enum</span> <span class="n">Node</span><span class="o">&lt;</span><span class="n">Item</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="nf">Leaf</span><span class="p">(</span><span class="n">Item</span><span class="p">),</span>
+    <span class="nf">Children</span><span class="p">(</span><span class="nb">Vec</span><span class="o">&lt;</span><span class="n">Node</span><span class="o">&lt;</span><span class="n">Item</span><span class="o">&gt;&gt;</span><span class="p">),</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Simple, right? A tree node is either a <code>Leaf</code>, in which case it contains an <code>Item</code>, or a list of child nodes.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_a-traverse-method">A <code>traverse</code> method</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>We want to traverse (i.e. iterate over) this kind of tree <em>depth-first</em>. This means that when a node has multiple children, we first traverse the first child <em>and all its descendants</em> before moving on to the second child. This is easy to implement with a recursive algorithm:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="n">Node</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">fn</span> <span class="nf">traverse</span><span class="p">(</span><span class="o">&amp;</span><span class="k">self</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">match</span> <span class="k">self</span> <span class="p">{</span>
+            <span class="nn">Node</span><span class="p">::</span><span class="nf">Leaf</span><span class="p">(</span><span class="mi">_</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{}</span>
+            <span class="nn">Node</span><span class="p">::</span><span class="nf">Children</span><span class="p">(</span><span class="n">children</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+                <span class="k">for</span> <span class="n">node</span> <span class="n">in</span> <span class="n">children</span> <span class="p">{</span>
+                    <span class="n">node</span><span class="nf">.traverse</span><span class="p">();</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If we want to do something with each item, we can pass a closure to the function:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="n">Node</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">fn</span> <span class="nf">traverse</span><span class="p">(</span><span class="o">&amp;</span><span class="k">self</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="k">impl</span> <span class="nf">Fn</span><span class="p">(</span><span class="o">&amp;</span><span class="n">It</span><span class="p">))</span> <span class="p">{</span>
+        <span class="k">match</span> <span class="k">self</span> <span class="p">{</span>
+            <span class="nn">Node</span><span class="p">::</span><span class="nf">Leaf</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+                <span class="nf">f</span><span class="p">(</span><span class="n">item</span><span class="p">);</span>
+            <span class="p">}</span>
+            <span class="nn">Node</span><span class="p">::</span><span class="nf">Children</span><span class="p">(</span><span class="n">children</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+                <span class="k">for</span> <span class="n">node</span> <span class="n">in</span> <span class="n">children</span> <span class="p">{</span>
+                    <span class="n">node</span><span class="nf">.traverse</span><span class="p">(</span><span class="o">&amp;</span><span class="n">f</span><span class="p">);</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This allows us to iterate over the items. However, <code>Tree</code> still doesn&#8217;t implement the <code>Iterator</code> trait, which would be useful because it provides helper methods such as <code>filter</code>, <code>fold</code> and <code>collect</code>.</p>
+</div>
+<div class="paragraph">
+<p>As we will see shortly, implementing this trait is quite tricky in this case. The reason for this is that the <code>Iterator</code> trait provides <em>external iteration</em>, whereas our <code>traverse</code> method provides <em>internal iteration</em>.</p>
+</div>
+<div class="openblock hint">
+<div class="title">External and internal iteration</div>
+<div class="content">
+<div class="paragraph">
+<p>Internal iteration means that a closure is passed to a function, which calls the closure for every element. This means that the iterator function has full control over the iteration.</p>
+</div>
+<div class="paragraph">
+<p>External iteration on the other hand means that there&#8217;s a struct with a method to get the next element. This means that the code <em>using</em> the iterator controls the iteration. It can pause the iteration, do something else, pass the iterator to another function and maybe resume it later. External iteration is therefore very powerful and flexible.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_implementing-the-iterator-trait">Implementing the <code>Iterator</code> trait</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To be able to <em>externally</em> iterate over the tree, we need to implement the <code>Iterator</code> trait. It looks roughly like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">trait</span> <span class="n">Iterator</span> <span class="p">{</span>
+    <span class="k">type</span> <span class="n">Item</span><span class="p">;</span>
+
+    <span class="k">fn</span> <span class="nf">next</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="nn">Self</span><span class="p">::</span><span class="n">Item</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The iterator trait is usually not implemented for a collection <em>directly</em>. Instead, a <em>new type</em> is created that wraps the collection:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">struct</span> <span class="n">NodeIter</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">It</span><span class="o">&gt;</span><span class="p">(</span><span class="o">&amp;</span><span class="nv">'a</span> <span class="n">Tree</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span><span class="p">);</span></code></pre>
+</div>
+</div>
+<div class="openblock hint">
+<div class="title">Why not implement <code>Iterator</code> for the collection?</div>
+<div class="content">
+<div class="paragraph">
+<p>This great question was asked recently on Reddit. One reason is, if the collection implemented the <code>Iterator</code> type directly, the collection could be modified during iteration, which is is error-prone and usually undesired. It would also make it impossible to have multiple iterators that iterate over the same collection simultaneously and independently from each other, because the <code>Iterator::next()</code> method borrows the iterator mutably.</p>
+</div>
+<div class="paragraph">
+<p>More importantly, though, iterators usually need additional state to keep track of the position of the next item in the collection. This state needs to be updated in every iteration, which doesn&#8217;t work if the collection is behind an immutable reference and the state is part of the collection.</p>
+</div>
+<div class="paragraph">
+<p>If the iterator is a separate type, it can be mutable even though the collection is immutable. You&#8217;ll see how this works in a moment, just read on!</p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>As the immutable reference in the <code>NodeIter</code> type indicates, it can only iterate over immutable references of the items. To get an instance of this iterator, we add a <code>.iter()</code> method:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="n">Node</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">fn</span> <span class="nf">iter</span><span class="p">(</span><span class="o">&amp;</span><span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="n">NodeIter</span><span class="o">&lt;</span><span class="nv">'_</span><span class="p">,</span> <span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+        <span class="nf">NodeIter</span><span class="p">(</span><span class="k">self</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now we can start with the actual implementation!</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">It</span><span class="o">&gt;</span> <span class="n">Iterator</span> <span class="k">for</span> <span class="n">NodeIter</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">type</span> <span class="n">Item</span> <span class="o">=</span> <span class="o">&amp;</span><span class="nv">'a</span> <span class="n">It</span><span class="p">;</span>
+
+    <span class="k">fn</span> <span class="nf">next</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="nn">Self</span><span class="p">::</span><span class="n">Item</span><span class="o">&gt;</span> <span class="p">{</span>
+        <span class="nd">todo!</span><span class="p">()</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now there&#8217;s a problem: Since <code>Iterator</code> provides external iteration, we have to produce one item at a time. This means that we can&#8217;t use the simple recursive algorithm we used in the <code>traverse</code> method. Instead, we have to keep track of the state of the iterator manually:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">struct</span> <span class="n">NodeIter</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="n">children</span><span class="p">:</span> <span class="o">&amp;</span><span class="nv">'a</span> <span class="p">[</span><span class="n">Node</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span><span class="p">],</span>
+    <span class="n">parent</span><span class="p">:</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="nb">Box</span><span class="o">&lt;</span><span class="n">NodeIter</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">It</span><span class="o">&gt;&gt;&gt;</span><span class="p">,</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>children</code> field contains the remaining children of a node, the <code>parent</code> field is the iterator of the parent node, if present. It must be wrapped in a <code>Box</code> because a struct in Rust can&#8217;t contain itself without indirection – otherwise, it would be impossible to compute its size on the stack.</p>
+</div>
+<div class="paragraph">
+<p>So how does this work? When we create the iterator, we put the node into the <code>children</code> slice and set <code>parent</code> to <code>None</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="n">Node</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">fn</span> <span class="nf">iter</span><span class="p">(</span><span class="o">&amp;</span><span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="n">NodeIter</span><span class="o">&lt;</span><span class="nv">'_</span><span class="p">,</span> <span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+        <span class="n">NodeIter</span> <span class="p">{</span>
+            <span class="n">children</span><span class="p">:</span> <span class="nn">std</span><span class="p">::</span><span class="nn">slice</span><span class="p">::</span><span class="nf">from_ref</span><span class="p">(</span><span class="k">self</span><span class="p">),</span>
+            <span class="n">parent</span><span class="p">:</span> <span class="nb">None</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>When the iterator is advanced, we first check if <code>children</code> is empty. If that&#8217;s the case, we try to continue iterating the parent node. If there is no parent node, we return <code>None</code>.</p>
+</div>
+<div class="paragraph">
+<p>If <code>children</code> is not empty, we remove the first child and check its variant. If it is a <code>Node::Leaf</code>, we return its content; if it is a <code>Node::Children</code>, we create a new iterator for the children. The <code>parent</code> field is set to <code>self</code>, and <code>self</code> is replaced with the newly created iterator:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="n">mem</span><span class="p">;</span>
+
+<span class="k">impl</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">It</span><span class="o">&gt;</span> <span class="n">Iterator</span> <span class="k">for</span> <span class="n">NodeIter</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">type</span> <span class="n">Item</span> <span class="o">=</span> <span class="o">&amp;</span><span class="nv">'a</span> <span class="n">It</span><span class="p">;</span>
+
+    <span class="k">fn</span> <span class="nf">next</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="nn">Self</span><span class="p">::</span><span class="n">Item</span><span class="o">&gt;</span> <span class="p">{</span>
+        <span class="k">match</span> <span class="k">self</span><span class="py">.children</span><span class="nf">.get</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+            <span class="nb">None</span> <span class="k">=&gt;</span> <span class="k">match</span> <span class="k">self</span><span class="py">.parent</span><span class="nf">.take</span><span class="p">()</span> <span class="p">{</span>
+                <span class="nf">Some</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+                    <span class="c">// continue with the parent node</span>
+                    <span class="o">*</span><span class="k">self</span> <span class="o">=</span> <span class="o">*</span><span class="n">parent</span><span class="p">;</span>
+                    <span class="k">self</span><span class="nf">.next</span><span class="p">()</span>
+                <span class="p">}</span>
+                <span class="nb">None</span> <span class="k">=&gt;</span> <span class="nb">None</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="nf">Some</span><span class="p">(</span><span class="nn">Node</span><span class="p">::</span><span class="nf">Leaf</span><span class="p">(</span><span class="n">item</span><span class="p">))</span> <span class="k">=&gt;</span> <span class="p">{</span>
+                <span class="k">self</span><span class="py">.children</span> <span class="o">=</span> <span class="o">&amp;</span><span class="k">self</span><span class="py">.children</span><span class="p">[</span><span class="mi">1</span><span class="o">..</span><span class="p">];</span>
+                <span class="nf">Some</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+            <span class="p">}</span>
+            <span class="nf">Some</span><span class="p">(</span><span class="nn">Node</span><span class="p">::</span><span class="nf">Children</span><span class="p">(</span><span class="n">children</span><span class="p">))</span> <span class="k">=&gt;</span> <span class="p">{</span>
+                <span class="k">self</span><span class="py">.children</span> <span class="o">=</span> <span class="o">&amp;</span><span class="k">self</span><span class="py">.children</span><span class="p">[</span><span class="mi">1</span><span class="o">..</span><span class="p">];</span>
+
+                <span class="c">// start iterating the child trees</span>
+                <span class="o">*</span><span class="k">self</span> <span class="o">=</span> <span class="n">NodeIter</span> <span class="p">{</span>
+                    <span class="n">children</span><span class="p">:</span> <span class="n">children</span><span class="nf">.as_slice</span><span class="p">(),</span>
+                    <span class="n">parent</span><span class="p">:</span> <span class="nf">Some</span><span class="p">(</span><span class="nn">Box</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="nn">mem</span><span class="p">::</span><span class="nf">take</span><span class="p">(</span><span class="k">self</span><span class="p">))),</span>
+                <span class="p">};</span>
+                <span class="k">self</span><span class="nf">.next</span><span class="p">()</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This doesn&#8217;t work yet, because <a href="https://doc.rust-lang.org/std/mem/fn.take.html"><code>mem::take()</code></a> requires that <code>NodeIter</code> implements <code>Default</code>. But this can be fixed easily:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="n">Default</span> <span class="k">for</span> <span class="n">NodeIter</span><span class="o">&lt;</span><span class="nv">'_</span><span class="p">,</span> <span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">fn</span> <span class="nf">default</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="n">Self</span> <span class="p">{</span>
+        <span class="n">NodeIter</span> <span class="p">{</span> <span class="n">children</span><span class="p">:</span> <span class="o">&amp;</span><span class="p">[],</span> <span class="n">parent</span><span class="p">:</span> <span class="nb">None</span> <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="openblock hint">
+<div class="title">The <code>mem::take()</code> function</div>
+<div class="content">
+<div class="paragraph">
+<p><a href="https://doc.rust-lang.org/std/mem/fn.take.html"><code>mem::take()</code></a> replaces a mutable reference with its default value and returns the previous value. The previous value is effectively <em>moved out</em> of the reference. We use it here to convert <code>&amp;mut self</code> to an owned value, because <code>parent</code> must be owned.</p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>Now let&#8217;s see if the iterator works!</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_testing">Testing</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To check if it works, we can write a unit test:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="nd">#[test]</span>
+<span class="k">fn</span> <span class="nf">test_borrowing_iterator</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">tree</span> <span class="o">=</span> <span class="nn">Node</span><span class="p">::</span><span class="nf">Children</span><span class="p">(</span><span class="nd">vec!</span><span class="p">[</span>
+        <span class="nn">Node</span><span class="p">::</span><span class="nf">Leaf</span><span class="p">(</span><span class="mi">5</span><span class="p">),</span>
+        <span class="nn">Node</span><span class="p">::</span><span class="nf">Leaf</span><span class="p">(</span><span class="mi">4</span><span class="p">),</span>
+        <span class="nn">Node</span><span class="p">::</span><span class="nf">Children</span><span class="p">(</span><span class="nd">vec!</span><span class="p">[</span>
+            <span class="nn">Node</span><span class="p">::</span><span class="nf">Leaf</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
+            <span class="nn">Node</span><span class="p">::</span><span class="nf">Leaf</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span>
+            <span class="nn">Node</span><span class="p">::</span><span class="nf">Children</span><span class="p">(</span><span class="nd">vec!</span><span class="p">[]),</span>
+        <span class="p">]),</span>
+        <span class="nn">Node</span><span class="p">::</span><span class="nf">Children</span><span class="p">(</span><span class="nd">vec!</span><span class="p">[</span>
+            <span class="nn">Node</span><span class="p">::</span><span class="nf">Children</span><span class="p">(</span><span class="nd">vec!</span><span class="p">[</span>
+                <span class="nn">Node</span><span class="p">::</span><span class="nf">Children</span><span class="p">(</span><span class="nd">vec!</span><span class="p">[</span><span class="nn">Node</span><span class="p">::</span><span class="nf">Leaf</span><span class="p">(</span><span class="mi">1</span><span class="p">)]),</span>
+                <span class="nn">Node</span><span class="p">::</span><span class="nf">Leaf</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+            <span class="p">]),</span>
+        <span class="p">]),</span>
+    <span class="p">]);</span>
+
+    <span class="k">let</span> <span class="n">nums</span><span class="p">:</span> <span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">i32</span><span class="o">&gt;</span> <span class="o">=</span> <span class="n">tree</span><span class="nf">.iter</span><span class="p">()</span><span class="nf">.copied</span><span class="p">()</span><span class="nf">.collect</span><span class="p">();</span>
+    <span class="nd">assert_eq!</span><span class="p">(</span><span class="n">nums</span><span class="p">,</span> <span class="nd">vec!</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]);</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="sh"><span class="o">&gt;</span> cargo <span class="nb">test</span> <span class="nt">-q</span>
+
+running 1 <span class="nb">test</span>
+<strong class="green">.</strong>
+<span class="nb">test </span>result: <strong class="green">ok</strong>. 1 passed<span class="p">;</span> 0 failed<span class="p">;</span> 0 ignored<span class="p">;</span> 0 measured<span class="p">;</span> 0 filtered out<span class="p">;</span> finished <span class="k">in </span>0.00s</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>That looks reassuring!</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_adding-features">Adding features</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Now that we have a working iterator, let&#8217;s see how we can improve it. First, let&#8217;s check if we can implement more iterator methods to make it more efficient!</p>
+</div>
+<div class="sect2">
+<h3 id="_size-hint">Size hint</h3>
+<div class="paragraph">
+<p>Every iterator has a size hint, to help the <code>collect</code> methods decide how much memory to allocate when collecting into something like a <code>Vec</code>. By default the lower bound of the size hint is 0, so the <code>collect</code> method might have to re-allocate a few times. This is still better than setting the size hint too high, because that would waste memory.</p>
+</div>
+<div class="paragraph">
+<p>Unfortunately, we don&#8217;t know how many elements a <code>Node</code> contains, and calculating the number of elements would be expensive, so we&#8217;ll skip the <code>size_hint</code> method.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_fusediterator"><code>FusedIterator</code></h3>
+<div class="paragraph">
+<p>Sometimes it&#8217;s useful to ensure that after the iterator produces <code>None</code> for the first time, it will only produce <code>None</code> values. Iterators with this property are called <em>fused iterators</em>, and any iterator can be converted to a fused iterator with the <code>.fused()</code> method.</p>
+</div>
+<div class="paragraph">
+<p>However, if we implement the <code>FusedIterator</code> trait for our iterator, calling the <code>.fused()</code> method is more efficient, because it has a specialized implementation for types that implement this trait. So let&#8217;s add it:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">iter</span><span class="p">::</span><span class="n">FusedIterator</span><span class="p">;</span>
+
+<span class="k">impl</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="n">FusedIterator</span> <span class="k">for</span> <span class="n">NodeIter</span><span class="o">&lt;</span><span class="nv">'_</span><span class="p">,</span> <span class="n">It</span><span class="o">&gt;</span> <span class="p">{}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>That&#8217;s it!</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_intoiterator"><code>IntoIterator</code></h3>
+<div class="paragraph">
+<p>This trait doesn&#8217;t make the iterator more efficient, just more ergonomic. Implementing <code>IntoIterator</code> for <code>&amp;Node&lt;T&gt;</code> makes it possible to use a node in a <code>for</code> loop without having to write <code>.iter()</code> explicitly:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">It</span><span class="o">&gt;</span> <span class="n">IntoIterator</span> <span class="k">for</span> <span class="o">&amp;</span><span class="nv">'a</span> <span class="n">Node</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">type</span> <span class="n">Item</span> <span class="o">=</span> <span class="o">&amp;</span><span class="nv">'a</span> <span class="n">It</span><span class="p">;</span>
+
+    <span class="k">type</span> <span class="n">IntoIter</span> <span class="o">=</span> <span class="n">NodeIter</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">It</span><span class="o">&gt;</span><span class="p">;</span>
+
+    <span class="k">fn</span> <span class="nf">into_iter</span><span class="p">(</span><span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nn">Self</span><span class="p">::</span><span class="n">IntoIter</span> <span class="p">{</span>
+        <span class="k">self</span><span class="nf">.iter</span><span class="p">()</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Let&#8217;s try it out:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="nd">#[test]</span>
+<span class="k">fn</span> <span class="nf">test_borrowing_for_loop</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">tree</span> <span class="o">=</span> <span class="nn">Node</span><span class="p">::</span><span class="nf">Leaf</span><span class="p">(</span><span class="mi">42</span><span class="p">);</span>
+
+    <span class="k">for</span> <span class="o">&amp;</span><span class="n">node</span> <span class="n">in</span> <span class="o">&amp;</span><span class="n">tree</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="mi">_</span><span class="p">:</span> <span class="nb">i32</span> <span class="o">=</span> <span class="n">node</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>And&#8230;&#8203; it compiles! 🎉</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_an-owned-iterator">An owned iterator</h3>
+<div class="paragraph">
+<p>We can also implement an iterator that consumes the tree and produces the items as owned values. To implement this iterator, we can copy-paste the borrowed iterator and make a few adjustments:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">struct</span> <span class="n">NodeIntoIter</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="c">// we use a VecDeque because it allows</span>
+    <span class="c">// removing elements from the front efficiently <sup class="footnote">[<a id="_footnoteref_1" class="footnote" href="#_footnotedef_1" title="View footnote.">1</a>]</sup></span>
+    <span class="n">children</span><span class="p">:</span> <span class="n">VecDeque</span><span class="o">&lt;</span><span class="n">Node</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;&gt;</span><span class="p">,</span>
+    <span class="n">parent</span><span class="p">:</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="nb">Box</span><span class="o">&lt;</span><span class="n">NodeIntoIter</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;&gt;&gt;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">impl</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="n">Default</span> <span class="k">for</span> <span class="n">NodeIntoIter</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">fn</span> <span class="nf">default</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="n">Self</span> <span class="p">{</span>
+        <span class="n">NodeIntoIter</span> <span class="p">{</span>
+            <span class="n">children</span><span class="p">:</span> <span class="nn">Default</span><span class="p">::</span><span class="nf">default</span><span class="p">(),</span>
+            <span class="n">parent</span><span class="p">:</span> <span class="nb">None</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">impl</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="n">Iterator</span> <span class="k">for</span> <span class="n">NodeIntoIter</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">type</span> <span class="n">Item</span> <span class="o">=</span> <span class="n">It</span><span class="p">;</span>
+
+    <span class="k">fn</span> <span class="nf">next</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="nn">Self</span><span class="p">::</span><span class="n">Item</span><span class="o">&gt;</span> <span class="p">{</span>
+        <span class="k">match</span> <span class="k">self</span><span class="py">.children</span><span class="nf">.pop_front</span><span class="p">()</span> <span class="p">{</span>
+            <span class="nb">None</span> <span class="k">=&gt;</span> <span class="k">match</span> <span class="k">self</span><span class="py">.parent</span><span class="nf">.take</span><span class="p">()</span> <span class="p">{</span>
+                <span class="nf">Some</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+                    <span class="c">// continue with the parent node</span>
+                    <span class="o">*</span><span class="k">self</span> <span class="o">=</span> <span class="o">*</span><span class="n">parent</span><span class="p">;</span>
+                    <span class="k">self</span><span class="nf">.next</span><span class="p">()</span>
+                <span class="p">}</span>
+                <span class="nb">None</span> <span class="k">=&gt;</span> <span class="nb">None</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="nf">Some</span><span class="p">(</span><span class="nn">Node</span><span class="p">::</span><span class="nf">Leaf</span><span class="p">(</span><span class="n">item</span><span class="p">))</span> <span class="k">=&gt;</span> <span class="nf">Some</span><span class="p">(</span><span class="n">item</span><span class="p">),</span>
+            <span class="nf">Some</span><span class="p">(</span><span class="nn">Node</span><span class="p">::</span><span class="nf">Children</span><span class="p">(</span><span class="n">children</span><span class="p">))</span> <span class="k">=&gt;</span> <span class="p">{</span>
+                <span class="c">// start iterating the child trees</span>
+                <span class="o">*</span><span class="k">self</span> <span class="o">=</span> <span class="n">NodeIntoIter</span> <span class="p">{</span>
+                    <span class="n">children</span><span class="p">:</span> <span class="n">children</span><span class="nf">.into</span><span class="p">(),</span>
+                    <span class="n">parent</span><span class="p">:</span> <span class="nf">Some</span><span class="p">(</span><span class="nn">Box</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="nn">mem</span><span class="p">::</span><span class="nf">take</span><span class="p">(</span><span class="k">self</span><span class="p">))),</span>
+                <span class="p">};</span>
+                <span class="k">self</span><span class="nf">.next</span><span class="p">()</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now let&#8217;s implement <code>IntoIterator</code> for <code>Node</code>, so we can use it:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="n">IntoIterator</span> <span class="k">for</span> <span class="n">Node</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">type</span> <span class="n">Item</span> <span class="o">=</span> <span class="n">It</span><span class="p">;</span>
+
+    <span class="k">type</span> <span class="n">IntoIter</span> <span class="o">=</span> <span class="n">NodeIntoIter</span><span class="o">&lt;</span><span class="n">It</span><span class="o">&gt;</span><span class="p">;</span>
+
+    <span class="k">fn</span> <span class="nf">into_iter</span><span class="p">(</span><span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nn">Self</span><span class="p">::</span><span class="n">IntoIter</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">children</span> <span class="o">=</span> <span class="nn">VecDeque</span><span class="p">::</span><span class="nf">with_capacity</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+        <span class="n">children</span><span class="nf">.push_back</span><span class="p">(</span><span class="k">self</span><span class="p">);</span>
+
+        <span class="n">NodeIntoIter</span> <span class="p">{</span>
+            <span class="n">children</span><span class="p">,</span>
+            <span class="n">parent</span><span class="p">:</span> <span class="nb">None</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Don&#8217;t forget to test it:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="sh"><span class="o">&gt;</span> cargo <span class="nb">test</span> <span class="nt">-q</span>
+
+running 4 tests
+<strong class="green">....</strong>
+<span class="nb">test </span>result: <strong class="green">ok</strong>. 4 passed<span class="p">;</span> 0 failed<span class="p">;</span> 0 ignored<span class="p">;</span> 0 measured<span class="p">;</span> 0 filtered out<span class="p">;</span> finished <span class="k">in </span>0.00s</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_a-mutable-iterator">A mutable iterator</h3>
+<div class="paragraph">
+<p>Collections usually also have an iterator for mutating the items. They can be particularly tricky to implement safely, because you have to ensure that no part of the iterator is ever borrowed mutably multiple times.</p>
+</div>
+<div class="paragraph">
+<p>But because this blog post is already way too long, I leave this part as an exercise to the reader. 😛</p>
+</div>
+<div class="openblock hint">
+<div class="title">How to borrow multiple things from a slice mutably?</div>
+<div class="content">
+<div class="paragraph">
+<p>Getting multiple mutable references into a slice isn&#8217;t easy.
+One way is to create a mutable iterator with <code>.iter_mut()</code>. Also there&#8217;s a number of methods to help you out:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="https://doc.rust-lang.org/std/primitive.slice.html#method.split_at_mut"><code>split_at_mut</code></a></p>
+</li>
+<li>
+<p><a href="https://doc.rust-lang.org/std/primitive.slice.html#method.split_first_mut"><code>split_first_mut</code></a></p>
+</li>
+<li>
+<p><a href="https://doc.rust-lang.org/std/primitive.slice.html#method.split_last_mut"><code>split_last_mut</code></a></p>
+</li>
+<li>
+<p><a href="https://doc.rust-lang.org/std/primitive.slice.html#method.split_mut"><code>split_mut</code></a></p>
+</li>
+<li>
+<p><a href="https://doc.rust-lang.org/std/primitive.slice.html#method.split_inclusive_mut"><code>split_inclusive_mut</code></a></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>If you got stuck implementing this yourself, you may take a peek at <a href="https://play.rust-lang.org/?version=stable&amp;mode=debug&amp;edition=2018&amp;gist=936a02346b3a6703d67bf1de9f8d4cd8">this playground</a>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_what-about-doubleendediterator">What about <code>DoubleEndedIterator</code>?</h3>
+<div class="paragraph">
+<p><code>DoubleEndedIterator</code> is a trait implemented by iterators that can consume items from both ends. However, we won&#8217;t implement this trait for our iterators, because it would make them much more complicated. And who needs that trait anyway? 😉</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_fin">Fin</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>You should now be able to implement iterators for tree-like data structures.</p>
+</div>
+<div class="paragraph">
+<p>All code is available in this <a href="https://play.rust-lang.org/?version=stable&amp;mode=debug&amp;edition=2018&amp;gist=936a02346b3a6703d67bf1de9f8d4cd8">playground</a>. Discussion on <a href="https://www.reddit.com/r/rust/comments/m0wzw7/creating_an_iterator_in_rust/">Reddit</a>.</p>
+</div>
+<div class="paragraph">
+<p>If you have suggestions what topics I should cover next, please file a bug in the <a href="https://github.com/Aloso/aloso.github.io/issues">issue tracker</a>. Also file a bug if you have questions or want some things explained in more detail, or if you found a mistake.</p>
+</div>
+<div class="paragraph">
+<p>I will write posts regularly from now on. If you enjoyed this post, please subscribe to the atom feed (see at the bottom) and share it with your friends! Until next time!</p>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<hr>
+<div class="footnote" id="_footnotedef_1">
+<a href="#_footnoteref_1">1</a>. I was told that you can use a <code>std::vec::IntoIter</code> instead of a <code>VecDeque</code>, which is more efficient, and also more idiomatic. In the same way, a <code>std::slice::Iter</code> can be used for the reference iterator.
+</div>
+</div>
+        </div>
+    </div>
+    <div id="footer">
+    <div id="footer-inner">
+        &copy; Ludwig Stecher
+        <span class="bullet"></span>
+        <a href="https://github.com/Aloso">GitHub</a>
+        <span class="bullet"></span>
+        <a href="https://github.com/Aloso/aloso.github.io/">Found a typo?</a>
+        <span class="bullet"></span>
+        <a href="/feed.xml">Atom feed</a>
+    </div>
+</div>
+
+</body>
+</html>

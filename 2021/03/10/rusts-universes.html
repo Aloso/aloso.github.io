@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Nunito+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/layout.css?d41d8cd98f00b204e9800998ecf8427e">
+    <title>Rusts Universes</title>
+
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/fav/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/fav/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/fav/favicon-16x16.png">
+    <link rel="manifest" href="/assets/fav/site.webmanifest">
+    <link rel="mask-icon" href="/assets/fav/safari-pinned-tab.svg" color="#f88e00">
+    <link rel="shortcut icon" href="/assets/fav/favicon.ico">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-config" content="/assets/fav/browserconfig.xml">
+    <meta name="theme-color" content="#ffffff">
+</head>
+
+<body>
+    <div id="nav">
+    <div id="nav-inner">
+        
+            
+
+            
+                <a id="home" href="/">Aloso's blog</a>
+            
+        
+            
+
+            
+                <a href="/about">About</a>
+            
+        
+    </div>
+</div>
+
+    <div id="main">
+        <div id="main-inner">
+            <h1>Rusts Universes</h1>
+            
+            <div id="meta">
+                10 Mar 2021
+                <span class="bullet"></span>
+                8 minutes read
+            </div>
+            
+
+            
+            <div id="toc">
+                <div id="toc-title">Table of Contents</div>
+                <ul class="sectlevel1">
+<li><a href="#_identifiers">Identifiers</a></li>
+<li><a href="#_namespaces">Namespaces</a></li>
+<li><a href="#_what-does-that-mean">What does that mean?</a></li>
+<li><a href="#_resolving-names-from-different-namespaces">Resolving names from different namespaces</a></li>
+<li><a href="#_importing-names">Importing names</a></li>
+<li><a href="#_end">End</a></li>
+</ul>
+            </div>
+            
+
+            <div class="paragraph">
+<p>This post describes a curious feature of Rust: Namespaces, also called universes. Note that Rusts namespaces are nothing like namespaces in languages such as TypeScript or C♯; they are also unrelated to all of space and time, although there are certainly parallels.</p>
+</div>
+<div class="openblock hint">
+<div class="content">
+<div class="paragraph">
+<p>It was pointed out that nobody actually calls them universes. The reason I thought that is the following quote from the <a href="https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/enum.Namespace.html">rustc documentation</a>:</p>
+</div>
+<div class="quoteblock">
+<blockquote>
+<div class="paragraph">
+<p>Different kinds of symbols don’t influence each other.</p>
+</div>
+<div class="paragraph">
+<p>Therefore, they have a separate universe (namespace).</p>
+</div>
+</blockquote>
+</div>
+<div class="paragraph">
+<p>However, this is more of a <em>figure of speech</em> than a proper term. I apologize for the confusion.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_identifiers">Identifiers</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To understand namespaces, we first need to talk about names. Namespaces contain all the names (called <em>identifiers</em>) in Rust code. This does not include keywords, but it includes the names of local variables, types, traits, functions, modules, generic arguments, macros, and so on.</p>
+</div>
+<div class="paragraph">
+<p>Every identifier has a certain scope. For example, local variables are scoped to the block they were defined in, free functions are scoped to their module, trait methods are scoped to their trait, inherent methods to their type. Etcetera. It&#8217;s not possible to use an identifier outside of its scope, unless it was brought into scope with a <code>use</code> statement. So far so good.</p>
+</div>
+<div class="paragraph">
+<p>But what happens when a scope contains multiple things with the same name? Now it gets complicated. In most cases, you&#8217;ll get a compiler error. An exception are local variables and macros, which use <em>textual scoping</em>, and therefore allow <em>shadowing</em> things with the same name:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">let</span> <span class="n">x</span> <span class="o">=</span> <span class="mi">5</span><span class="p">;</span>
+<span class="k">let</span> <span class="n">x</span> <span class="o">=</span> <span class="s">"hello world!"</span><span class="p">;</span>  <span class="c">// no problemo!</span>
+
+<span class="nd">macro_rules!</span> <span class="n">x</span> <span class="p">{</span>
+    <span class="p">(</span><span class="nv">$e:expr</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{}</span>
+<span class="p">}</span>
+<span class="nd">macro_rules!</span> <span class="n">x</span> <span class="p">{</span>  <span class="c">// who cares!</span>
+    <span class="p">()</span> <span class="k">=&gt;</span> <span class="p">{}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>These are the only exceptions, however. All other things use <em>path-based scoping</em>. While local variables and macros have to be declared before they can be used, things with path-based scoping can be declared and used in any order:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="nd">m!</span><span class="p">();</span>  <span class="c">// error: m is not defined at this point</span>
+<span class="nd">macro_rules!</span> <span class="n">m</span> <span class="p">{</span>
+    <span class="p">()</span> <span class="k">=&gt;</span> <span class="p">{}</span>
+<span class="p">}</span>
+
+<span class="nf">f</span><span class="p">();</span>  <span class="c">// this is fine</span>
+<span class="k">fn</span> <span class="nf">f</span><span class="p">()</span> <span class="p">{}</span></code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_namespaces">Namespaces</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>However, path-scoped things have a limitation: There can&#8217;t be more than one thing with the same name defined in the same scope <em>and namespace</em>. For example:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">fn</span> <span class="nf">wtf</span><span class="p">()</span> <span class="p">{}</span>
+<span class="k">const</span> <span class="n">wtf</span><span class="p">:</span> <span class="nb">u8</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>  <span class="c">// error: the name `wtf` is defined multiple times</span>
+
+<span class="k">mod</span> <span class="n">wtf</span> <span class="p">{}</span>  <span class="c">// this is allowed‽</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Why is that? the function <code>wtf</code> and the constant <code>wtf</code> both live in the same namespace, therefore their names clash. The module <code>wtf</code> however lives in a different namespace, so it can coexist with a function or constant of the same name. One might say, it&#8217;s in a parallel universe.</p>
+</div>
+<div class="paragraph hint">
+<p>Note that constants are usually written in UPPER_CASE, so functions and constants can&#8217;t clash in idiomatic code. I wrote the above code just to prove a point, please don&#8217;t quote me on it. 😉</p>
+</div>
+<div class="paragraph">
+<p>So you&#8217;re probably wondering, how many namespaces are there? Let&#8217;s look in the <a href="https://archive.is/ajZHM">documentation of the rustc source</a>! There are 3:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>The <em>type namespace</em></p>
+</li>
+<li>
+<p>The <em>value namespace</em></p>
+</li>
+<li>
+<p>The <em>macro namespace</em></p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Which items are part of which namespace is specified <a href="https://archive.is/OZM8P">here</a> in the <code>DefKind</code> type:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>The <em>type namespace</em> contains</p>
+<div class="ulist">
+<ul>
+<li>
+<p>modules</p>
+</li>
+<li>
+<p>structs</p>
+</li>
+<li>
+<p>enums</p>
+</li>
+<li>
+<p>unions</p>
+</li>
+<li>
+<p>enum variants</p>
+</li>
+<li>
+<p>traits</p>
+</li>
+<li>
+<p>type aliases</p>
+</li>
+<li>
+<p>foreign types</p>
+</li>
+<li>
+<p>trait aliases (currently unstable)</p>
+</li>
+<li>
+<p>associated types</p>
+</li>
+<li>
+<p>type parameters</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p>The <em>value namespace</em> contains</p>
+<div class="ulist">
+<ul>
+<li>
+<p>functions</p>
+</li>
+<li>
+<p>constants</p>
+</li>
+<li>
+<p><code>const</code> parameters</p>
+</li>
+<li>
+<p>statics</p>
+</li>
+<li>
+<p>constructors</p>
+</li>
+<li>
+<p>associated functions</p>
+</li>
+<li>
+<p>associated constants</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p>The <em>macro namespace</em> just contains macros.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>All other names are treated specially and don&#8217;t fall into any of the above categories.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_what-does-that-mean">What does that mean?</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Items with the same name can coexist in the same scope, if they are from different namespaces. One example for this are <em>tuple structs</em>, because they are desugared (i.e. transformed by the compiler) into a regular struct and a constructor function:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">struct</span> <span class="nf">Foo</span><span class="p">(</span><span class="n">Bar</span><span class="p">);</span>
+
+<span class="c">// the compiler transforms the above into something like this:</span>
+
+<span class="k">struct</span> <span class="n">Foo</span> <span class="p">{</span> <span class="mi">0</span><span class="p">:</span> <span class="n">Bar</span> <span class="p">};</span>
+
+<span class="k">fn</span> <span class="nf">Foo</span><span class="p">(</span><span class="mi">_0</span><span class="p">:</span> <span class="n">Bar</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="n">Foo</span> <span class="p">{</span>
+    <span class="n">Foo</span> <span class="p">{</span> <span class="mi">0</span><span class="p">:</span> <span class="mi">_0</span> <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph hint">
+<p>This isn&#8217;t valid Rust syntax, but that&#8217;s not a problem for the compiler, because the transformation happens internally, after the code was already parsed.</p>
+</div>
+<div class="paragraph">
+<p>So this is why tuple structs can be both used as a type and invoked like a function. However, it also means that tuple structs occupy both the type namespace and the value namespace. Roughly the same happens with enum variants with round brackets. Furthermore, unit structs and unit-like enum variants expand to a type name and a value (a constant), so they also occupy both namespaces.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_resolving-names-from-different-namespaces">Resolving names from different namespaces</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Rusts syntax is designed to be unambiguous about the namespace in which the names live. It distinguishes between type positions and value positions, for example:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">fn</span> <span class="nf">a</span><span class="p">(</span><span class="n">b</span><span class="p">:</span> <span class="n">C</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="n">D</span> <span class="p">{</span>
+    <span class="nn">e</span><span class="p">::</span><span class="nn">f</span><span class="p">::</span><span class="n">G</span><span class="py">.h</span><span class="p">::</span><span class="o">&lt;</span><span class="n">I</span><span class="o">&gt;</span><span class="p">(</span><span class="n">j</span><span class="p">)</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Just by looking at the syntax, the compiler can tell that</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>C</code>, <code>D</code>, <code>e</code>, <code>f</code> and <code>I</code> are in the type namespace</p>
+</li>
+<li>
+<p><code>a</code>, <code>b</code>, <code>G</code>, <code>h</code> and <code>j</code> are in the value namespace</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>How does that work? Let&#8217;s start with the obvious ones: <code>a</code> and <code>h</code> are functions, and <code>b</code> is a local variable, so they must be in the value namespace. <code>j</code> is used as a function argument, so it&#8217;s also a value. <code>C</code> and <code>D</code> are used in type positions, so they&#8217;re types. <code>I</code> is used as a generic argument, so it&#8217;s also a type.</p>
+</div>
+<div class="paragraph">
+<p>That only leaves <code>e</code>, <code>f</code> and <code>G</code>. Since <code>e</code> and <code>f</code> are immediately followed by two colons (called the <em>scoping operator</em>), they must be in the type namespace. That makes sense, because types, traits and modules are in the type namespace. <code>G</code> however is followed by a dot, so it is parsed as a value.</p>
+</div>
+<div class="openblock hint">
+<div class="title">Note about const generics</div>
+<div class="content">
+<div class="paragraph">
+<p>A restricted version of const generics are <a href="https://blog.rust-lang.org/2021/02/26/const-generics-mvp-beta.html">about to be released</a> in stable Rust. This will introduce an ambiguity in the parser: In the expression <code>foo::&lt;X&gt;()</code>, the <code>X</code> can be both a type and a value.</p>
+</div>
+<div class="paragraph">
+<p>Rust resolves this ambiguity by preferring the type when there is both a type <code>X</code> and a value <code>X</code> in scope. If that is incorrect and the function expects a value, it must be wrapped in curly braces, i.e. <code>foo::&lt;{&nbsp;X&nbsp;}&gt;()</code>.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_importing-names">Importing names</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Items can be imported with a <code>use</code> item. But how are different namespaces handled? Generally, <code>use</code> imports items from all three namespaces. This means for example, when importing a tuple struct, both its type and its constructor are available.</p>
+</div>
+<div class="paragraph">
+<p>There is an exception, however: When a path ends with <code>::{self}</code> (the curly braces can contain more paths), only the name from the <em>type namespace</em> is imported. For example:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">mod</span> <span class="n">module</span> <span class="p">{</span>
+    <span class="k">pub</span> <span class="k">struct</span> <span class="nf">Foo</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="c">// import both the type Foo and its constructor:</span>
+<span class="k">use</span> <span class="nn">module</span><span class="p">::</span><span class="n">Foo</span><span class="p">;</span>
+
+<span class="c">// import only the type:</span>
+<span class="k">use</span> <span class="nn">module</span><span class="p">::</span><span class="nn">Foo</span><span class="p">::{</span><span class="k">self</span><span class="p">};</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Are you confused yet?</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_end">End</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>I hope you enjoyed this post, even though it&#8217;s less practically useful than my <a href="https://aloso.github.io/2021/03/09/creating-an-iterator.html">previous post</a>.</p>
+</div>
+<div class="paragraph">
+<p>Discussion on <a href="https://www.reddit.com/r/rust/comments/m1iour/rusts_universes/">Reddit</a>.</p>
+</div>
+<div class="paragraph">
+<p>If you have suggestions what topics I should cover next, please file a bug in the <a href="https://github.com/Aloso/aloso.github.io/issues">issue tracker</a>. Also file a bug if you have questions or want some things explained in more detail, or found a mistake.</p>
+</div>
+<div class="paragraph">
+<p>So long!</p>
+</div>
+</div>
+</div>
+        </div>
+    </div>
+    <div id="footer">
+    <div id="footer-inner">
+        &copy; Ludwig Stecher
+        <span class="bullet"></span>
+        <a href="https://github.com/Aloso">GitHub</a>
+        <span class="bullet"></span>
+        <a href="https://github.com/Aloso/aloso.github.io/">Found a typo?</a>
+        <span class="bullet"></span>
+        <a href="/feed.xml">Atom feed</a>
+    </div>
+</div>
+
+</body>
+</html>
