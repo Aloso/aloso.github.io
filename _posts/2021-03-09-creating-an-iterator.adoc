@@ -247,13 +247,13 @@ fn test_borrowing_iterator() {
 }
 ----
 
-[source, sh]
+[source, sh, subs="+macros,+quotes"]
 ----
 > cargo test -q
 
 running 1 test
-.
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+pass:q[[green\]*.*]
+test result: pass:q[[green\]*ok*]. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 ----
 
 That looks reassuring!
@@ -388,13 +388,13 @@ impl<It> IntoIterator for Node<It> {
 
 Don't forget to test it:
 
-[source, sh]
+[source, sh, subs="+quotes,macros+"]
 ----
 > cargo test -q
 
 running 4 tests
-....
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+pass:q[[green\]*....*]
+test result: pass:q[[green\]*ok*]. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 ----
 
 === A mutable iterator
