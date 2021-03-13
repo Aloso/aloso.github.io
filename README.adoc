@@ -1,16 +1,43 @@
-= Writing blog posts in Asciidoc
+= Aloso's blog
 
-== Front matter
+I'm Ludwig Stecher, and this repository contains my personal blog.
+
+== Contributing
+
+If you want to fix a mistake in a blog post, you'll find it in the `_posts` directory.
+
+The posts use Asciidoc. You should be able to pick up the basics by looking at some Asciidoc files. Headings start with `=` characters (the number of `=` characters specifies the heading level), _italic_ text is enclosed in `_` characters, *bold* text is enclosed in `*` characters, `monospaced` text is enclosed in ``` characters. Text that should ignore Asciidoc markup is enclosed in `+` characters.
+
+Code snippets are enclosed in blocks prefixed with `[source, language]`, e.g.
+
+[source, asciidoc]
+-----
+[source, rust]
+----
+fn this_is_a_code_snippet() {}
+----
+-----
+
+[source, rust]
+----
+fn this_is_a_code_snippet() {}
+----
+
+Links are written as `+https://www.example.com[Link text]+`. Footnotes are written as `+footnote:[Some text]+`.
+
+== Writing blog posts in Asciidoc
+
+=== Front matter
+
+The front matter is the first block of a post, enclosed in `---` characters.
 
 - Make sure that the date in the front matter matches the date in the file name.
-- Add `show_meta: true` to include publication date, read time and table of contents
+- Add `show_meta: true` to include publication date, time to read and table of contents
 - Add `excerpt_separator: // END OF EXCERPT` to specify where the excerpt should end. If omitted, the excerpt is the first paragraph.
 
-== Pages that aren't posts
+=== Pages that aren't posts
 
 Theses pages go in the root directory. They must also be mentioned in the `_data/navigation.yml` file if they should appear in the header.
-
-== Markup
 
 === Green boxes
 
@@ -51,3 +78,7 @@ fn contains_markup(v: pass:n[https://doc.rust-lang.org/std/vec/struct.Vec.html[V
     pass:n[[.c\]#//# footnote:[some text https://aloso.github.io[link text\] more text\]]
 }
 ----
+
+== License
+
+This work is licensed under a https://creativecommons.org/licenses/by/4.0/[Creative Commons Attribution 4.0 International] License.
