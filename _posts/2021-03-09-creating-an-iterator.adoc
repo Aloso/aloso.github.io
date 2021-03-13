@@ -67,7 +67,7 @@ impl<It> Node<It> {
 }
 ----
 
-This allows us to iterate over the items. However, `Tree` still doesn't implement the `Iterator` trait, which would be useful because it provides helper methods such as `filter`, `fold` and `collect`.
+This allows us to iterate over the items. However, `Node` still doesn't implement the `Iterator` trait, which would be useful because it provides helper methods such as `filter`, `fold` and `collect`.
 
 As we will see shortly, implementing this trait is quite tricky in this case. The reason for this is that the `Iterator` trait provides _external iteration_, whereas our `traverse` method provides _internal iteration_.
 
@@ -96,7 +96,7 @@ The iterator trait is usually not implemented for a collection _directly_. Inste
 
 [source, rust]
 ----
-struct NodeIter<'a, It>(&'a Tree<It>);
+struct NodeIter<'a, It>(&'a Node<It>);
 ----
 
 [.hint]
