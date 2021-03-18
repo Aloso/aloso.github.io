@@ -29,7 +29,7 @@ fn main() {
 <1> String is allocated on the heap
 <2> `s` is dropped, heap allocation is freed
 
-Another use case are containers that provide _interior mutability_, such as https://doc.rust-lang.org/std/cell/struct.RefCell.html[`RefCell`] or https://doc.rust-lang.org/std/sync/struct.Mutex.html[`Mutex`]. Before we can mutate one of these types, we have to aquire a _write lock_. Once the write lock is released, it can be aquired again. It is guaranteed that there is at most one write lock at any time, to prevent data races footnote:[`RefCell` can't actually prevent data races, it only prevents aliasing issues; `RefCell` is not thread-safe, so Rust ensures that it can only be used in a single thread. You can use a `Mutex` or `RwLock` when you need to use the data from multiple threads].
+Another use case are containers that provide _interior mutability_, such as https://doc.rust-lang.org/std/cell/struct.RefCell.html[`RefCell`] or https://doc.rust-lang.org/std/sync/struct.Mutex.html[`Mutex`]. Before we can mutate one of these types, we have to aquire a _write lock_. Once the write lock is released, it can be aquired again. It is guaranteed that there is at most one write lock at any time, to prevent data races footnote:[`RefCell` can't actually prevent data races, it only prevents aliasing issues; `RefCell` is not thread-safe (it doesn't perform locking), so Rust ensures that it can only be used in a single thread. You can use a `Mutex` or `RwLock` when you need to use the data from multiple threads].
 
 [.hint]
 .Data races
