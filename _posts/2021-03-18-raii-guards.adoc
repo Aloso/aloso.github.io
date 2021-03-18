@@ -1,0 +1,227 @@
+---
+layout: default
+title: Implementing RAII guards in Rust
+show_meta: true
+date: 2021-03-18
+author: Ludwig Stecher
+excerpt_separator: // END OF EXCERPT
+---
+
+As you probably know, Rust doesn't have automatic garbage collection. Instead, it relies on destructors to clean up memory, and these destructor calls are automatically inserted in the appropriate places at compile time. And since Rust uses traits for everything, destructors use a trait as well: The https://doc.rust-lang.org/std/ops/trait.Drop.html[`Drop`] trait.
+
+This has the benefit that `Drop` can be implemented to do anything, not just cleaning up memory: It can also release a file descriptor, close a network socket, cancel an in-flight HTTP request, and much more. Whenever you acquire some sort of resource, and what to release it when you're done with it, the `Drop` trait is your friend.
+
+In this blog post we'll first look at how the `Drop` trait works, and then implement the RAII guard pattern, step by step.
+
+// END OF EXCERPT
+
+== Where is `Drop` being used?
+
+The most common example are heap-allocated containers, such as `Box`, `Vec` and `String`. When such a value goes out of scope, it gets _dropped_, which means that its `Drop` implementation is called:
+
+[source, rust]
+----
+fn main() {
+    let mut s = "hello, world!!".to_string(); <1>
+    do_something(&mut s);
+} <2>
+----
+<1> String is allocated on the heap
+<2> `s` is dropped, heap allocation is freed
+
+Another use case are containers that provide _interior mutability_, such as https://doc.rust-lang.org/std/cell/struct.RefCell.html[`RefCell`]. Before we can mutate one of these types, we have to aquire a _write lock_. Once the write lock is released, it can be aquired again. It is guaranteed that there is at most one write lock at any time, to prevent data races.
+
+[.hint]
+.Data races
+--
+A race condition is a situation where multiple _actors_ (threads, processes, coroutines, etc.) can access a _shared resource_ at the same time without _synchronisation_. This may cause _data races_, which means that the actors influence each other, yielding erroneous results. `RefCell` provides synchronisation by ensuring that while it's mutated by an actor, other actors can't access it.
+
+For comparison, imagine two cars approaching an intersection from different directions. If the cars enter the intersection at the same time, they crash into one another. The cars are actors, the intersection is a shared resource, and the car crash is a data race. Crashes can be prevented with proper synchronisation, e.g. traffic lights.
+--
+
+== RAII
+
+RAII stands for “resource acquisition is initialisation”, which is not a very helpful name; it's a design pattern and means that every resource is managed by an object; when the object is created, the resource is acquired, and when the object is destroyed, the resource is released. This is what happens in the example above with the `String`: When `s` is created, a chunk of memory is acquired. When `s` is dropped, the memory is released again.
+
+However, sometimes it's useful to have a type that doesn't acquire a resource immediately, and can still be used after the resource has been released. Also, sometimes we want to acquire and release a resource multiple times in a row. That's where _RAII guards_ come in.
+
+== RAII guards
+
+RAII guards is a design pattern for managing a resource when RAII as described above is not flexible enough. It uses _two types_ instead of one: The first one contains a resource (or has a way of acquiring it), but doesn't allow us to access the resource directly. It does however have a method for creating an object of the second type. The second type is a _RAII guard_: It allows us to access the resource, until the RAII guard is dropped.
+
+One example of the RAII guards pattern is `RefCell`. To mutate a `RefCell`, we have to call its `borrow_mut` method. This returns a write lock, which is a RAII guard:
+
+[source, rust]
+----
+use std::cell::RefCell;
+
+fn main() {
+    let ref_cell = RefCell::new(7);
+    {
+        let mut guard = ref_cell.borrow_mut(); <1>
+        *guard *= 6;
+    } <2>
+    dbg!(ref_cell);
+} <3>
+----
+<1> The RAII guard is created, which borrows the `RefCell` and acquires a write lock.
+<2> The RAII guard is dropped, which releases the write lock.
+<3> The `RefCell` is dropped.
+
+== Implementation
+
+Let's implement a museum. People can come in and admire the exhibits:
+
+[source, rust]
+----
+pub struct Museum;
+
+impl Museum {
+    pub fn admire_exhibits(&self) {
+        println!("How amazing!");
+    }
+}
+----
+
+Now because of the current pandemic, no more than 20 visitors are allowed inside at any time. To ensure this, the ticket seller has only 20 tickets. Visitors need a ticket to enter the museum, and when they exit, they have to give it back.
+
+[source, rust]
+----
+pub struct Museum {
+    remaining_tickets: u32,
+}
+
+impl Museum {
+    pub fn new() -> Self {
+        Museum {
+            remaining_tickets: 20,
+        }
+    }
+
+    pub fn get_ticket(&mut self) -> Option<Ticket> {
+        if self.remaining_tickets > 0 {
+            self.remaining_tickets -= 1;
+            Some(Ticket(()))
+        } else {
+            None
+        }
+    }
+    
+    pub fn return_ticket(&mut self, ticket: Ticket) {
+        self.remaining_tickets -= 1;
+    }
+}
+
+pub struct Ticket(());
+
+impl Ticket {
+    pub fn admire_exhibits(&self) {
+        println!("How amazing!");
+    }
+}
+----
+
+How great! We have a `Museum` and a `Ticket` type. `Ticket` has a private field, so it can't be created directly from the public API. To get a ticket, one has to call `Museum::get_ticket`, which ensures that no more than 20 tickets are in circulation.
+
+This design suffers from two problems, however: First, if there are multiple museums, we don't know which ticket belongs to which museum. Although a visitor can't teleport from one museum to another, Rusts type system doesn't know that, so it allows us to get a ticket from one museum and return it at a different one. This means that more visitors could be in the museum than intended, which is bad during a pandemic. This could be prevented if the tickets had the museum's name on it, but that raises the question what to do when a wrong ticket is returned. We'd really like to avoid having to handle this type of error, if there's an alternative.
+
+The other problem is that this design doesn't force visitors to return their ticket when exiting the museum: If we forget to call `Museum::return_ticket`, the ticket is lost forever. Once all tickets are lost, nobody will be able to enter the museum, even though it is empty!
+
+Both problems can be solved by making `Ticket` a RAII guard, which borrows the museum:
+
+[source, rust]
+----
+use std::cell::RefCell;
+use std::ops::Drop;
+
+pub struct Museum {
+    remaining_tickets: RefCell<u32>,
+}
+
+impl Museum {
+    pub fn new() -> Self {
+        Museum {
+            remaining_tickets: RefCell::new(20),
+        }
+    }
+
+    pub fn get_ticket(&self) -> Option<Ticket<'_>> {
+        let mut lock = self.remaining_tickets.borrow_mut();
+        if *lock > 0 {
+            *lock -= 1;
+            Some(Ticket { museum: self })
+        } else {
+            None
+        }
+    }
+}
+
+pub struct Ticket<'a> {
+    museum: &'a Museum,
+}
+
+impl Ticket<'_> {
+    pub fn admire_exhibits(&self) {
+        println!("How amazing!");
+    }
+}
+
+impl Drop for Ticket<'_> {
+    fn drop(&mut self) {
+        let mut lock = self.museum.remaining_tickets.borrow_mut();
+        *lock += 1;
+    }
+}
+----
+
+Here's what changed:
+
+- `Ticket` borrows the `Museum`, so it can't be returned to the wrong museum.
+- `Museum::get_ticket` now takes `&self` instead of `&mut self`, because otherwise only one ticket could exist for each museum at a time.
+- `remaining_tickets` is wrapped in a `RefCell`, which provides interior mutability.
+- `Museum::return_ticket` was replaced with a `Drop` implementation for `Ticket`. This ensures that tickets are always returned.
+
+== Test it
+
+As always, it is a good idea to test the code:
+
+[source, rust]
+----
+#[test]
+fn test_museum() {
+    let museum = Museum::new();
+    let mut tickets: Vec<Ticket> = (0..20)
+        .map(|_| museum.get_ticket().unwrap())
+        .collect();
+    
+    assert!(museum.get_ticket().is_none());
+    tickets.pop();
+    tickets.push(museum.get_ticket().unwrap());
+    assert_eq!(*museum.remaining_tickets.borrow(), 0);
+    drop(tickets);
+    assert_eq!(*museum.remaining_tickets.borrow(), 20);
+}
+----
+
+Note that if the test is in the same module as the code, we can inspect private fields. Now let's run the test:
+
+[source, sh, subs="+macros,+quotes"]
+----
+> cargo test -q
+
+running 1 test
+pass:q[[green\]*.*]
+test result: pass:q[[green\]*ok*]. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+----
+
+== When `Drop` isn't called
+
+`Drop` implementations (called destructors) are called whenever the scope of the destructor's object is exited. It doesn't matter _how_ the scope is exited, e.g. it could be because of a `return`, `continue` or `break` statement, a `?` expression or a panic. There's one exception, however: When the process is exited, no destructors are run. This can be done e.g. by invoking https://doc.rust-lang.org/std/process/fn.abort.html[`abort`], https://doc.rust-lang.org/std/process/fn.exit.html[`exit`], or by panicking in a `Drop` implementation during another panic.
+
+It is also possible to _leak_ objects, which means that they will never be dropped. This is usually discouraged, but allowed. Objects can be leaked e.g. with the https://doc.rust-lang.org/std/boxed/struct.Box.html#method.leak[`Box::leak`] function, or by creating a https://doc.rust-lang.org/std/rc/[reference-counted] graph with a cycle. Another risk are power outages and OS crashes: For obvious reasons, values aren't dropped in such cases either.
+
+So you can't rely on destructors getting called. This is usually not a big problem, but something to be aware of when writing `Drop` implementations.
+
+== Fin
+
+Discussion on Reddit. Please https://github.com/Aloso/aloso.github.io/issues[file a bug] if you have questions, want some things explained in more detail, or if you found a mistake. See you around!

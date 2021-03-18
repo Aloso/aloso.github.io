@@ -11,8 +11,8 @@ exclude:
 
 asciidoctor:
   attributes:
-  - idprefix=_
-  - source-highlighter=rouge
+    - idprefix=_
+    - source-highlighter=rouge
 
 plugins:
   - jekyll-asciidoc
