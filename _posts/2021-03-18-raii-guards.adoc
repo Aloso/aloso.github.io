@@ -9,7 +9,7 @@ excerpt_separator: // END OF EXCERPT
 
 As you probably know, Rust doesn't have automatic garbage collection. Instead, it relies on destructors to clean up memory, and these destructor calls are automatically inserted in the appropriate places at compile time. And since Rust uses traits for everything, destructors use a trait as well: The https://doc.rust-lang.org/std/ops/trait.Drop.html[`Drop`] trait.
 
-This has the benefit that `Drop` can be implemented to do anything, not just cleaning up memory: It can also release a file descriptor, close a network socket, cancel an in-flight HTTP request, and much more. Whenever you acquire some sort of resource, and what to release it when you're done with it, the `Drop` trait is your friend.
+This has the benefit that `Drop` can be implemented to do anything, not just cleaning up memory: It can also release a file descriptor, close a network socket, cancel an in-flight HTTP request, and much more. Whenever you acquire some sort of resource, and want to release it when you're done with it, the `Drop` trait is your friend.
 
 In this blog post we'll first look at how the `Drop` trait works, and then implement the RAII guard pattern, step by step.
 
@@ -108,7 +108,7 @@ impl Museum {
     }
     
     pub fn return_ticket(&mut self, ticket: Ticket) {
-        self.remaining_tickets -= 1;
+        self.remaining_tickets += 1;
     }
 }
 
