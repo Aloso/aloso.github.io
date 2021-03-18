@@ -224,4 +224,4 @@ So you can't rely on destructors getting called. This is usually not a big probl
 
 == Fin
 
-Discussion on Reddit. Please https://github.com/Aloso/aloso.github.io/issues[file a bug] if you have questions, want some things explained in more detail, or if you found a mistake. See you around!
+Discussion on https://www.reddit.com/r/rust/comments/m7fxaz/implementing_raii_guards_in_rust/[Reddit]. Please https://github.com/Aloso/aloso.github.io/issues[file a bug] if you have questions, want some things explained in more detail, or if you found a mistake. See you around!
