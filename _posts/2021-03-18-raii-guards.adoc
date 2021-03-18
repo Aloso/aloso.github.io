@@ -29,12 +29,12 @@ fn main() {
 <1> String is allocated on the heap
 <2> `s` is dropped, heap allocation is freed
 
-Another use case are containers that provide _interior mutability_, such as https://doc.rust-lang.org/std/cell/struct.RefCell.html[`RefCell`]. Before we can mutate one of these types, we have to aquire a _write lock_. Once the write lock is released, it can be aquired again. It is guaranteed that there is at most one write lock at any time, to prevent data races.
+Another use case are containers that provide _interior mutability_, such as https://doc.rust-lang.org/std/cell/struct.RefCell.html[`RefCell`] or https://doc.rust-lang.org/std/sync/struct.Mutex.html[`Mutex`]. Before we can mutate one of these types, we have to aquire a _write lock_. Once the write lock is released, it can be aquired again. It is guaranteed that there is at most one write lock at any time, to prevent data races footnote:[`RefCell` can't actually prevent data races, it only prevents aliasing issues; `RefCell` is not thread-safe, so Rust ensures that it can only be used in a single thread. You can use a `Mutex` or `RwLock` when you need to use the data from multiple threads].
 
 [.hint]
 .Data races
 --
-A race condition is a situation where multiple _actors_ (threads, processes, coroutines, etc.) can access a _shared resource_ at the same time without _synchronisation_. This may cause _data races_, which means that the actors influence each other, yielding erroneous results. `RefCell` provides synchronisation by ensuring that while it's mutated by an actor, other actors can't access it.
+A race condition is a situation where multiple _actors_ (threads, processes, coroutines, etc.) can access a _shared resource_ at the same time without _synchronisation_. This may cause _data races_, which means that the actors influence each other, yielding erroneous results. `Mutex` provides synchronisation by ensuring that while it's mutated by an actor, other actors can't access it.
 
 For comparison, imagine two cars approaching an intersection from different directions. If the cars enter the intersection at the same time, they crash into one another. The cars are actors, the intersection is a shared resource, and the car crash is a data race. Crashes can be prevented with proper synchronisation, e.g. traffic lights.
 --
