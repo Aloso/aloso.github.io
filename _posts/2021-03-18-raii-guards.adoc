@@ -11,9 +11,9 @@ As you probably know, Rust doesn't have automatic garbage collection. Instead, i
 
 This has the benefit that `Drop` can be implemented to do anything, not just cleaning up memory: It can also release a file descriptor, close a network socket, cancel an in-flight HTTP request, and much more. Whenever you acquire some sort of resource, and want to release it when you're done with it, the `Drop` trait is your friend.
 
-In this blog post we'll first look at how the `Drop` trait works, and then implement the RAII guard pattern, step by step.
-
 // END OF EXCERPT
+
+In this blog post we'll first look at how the `Drop` trait works, and then implement the RAII guard pattern, step by step.
 
 == Where is `Drop` being used?
 

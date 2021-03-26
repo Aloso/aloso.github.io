@@ -15,7 +15,7 @@ Modules give your code _structure_: Dividing your code into modules is like divi
 
 [.medium]
 .Floor plan of the Schmidt-Lademann House. https://commons.wikimedia.org/wiki/File:Schmidt-Lademann_house_floor_plan.png[Source] (modified; https://creativecommons.org/licenses/by-sa/4.0/deed.en[license])
-image::2021-03-25-floor-plan.png[Floor plan]
+image::2021-03-26-floor-plan.png[Floor plan]
 
 == The module tree
 

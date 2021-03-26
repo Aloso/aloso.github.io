@@ -139,6 +139,27 @@ em {
         font-size: 0.9rem;
         opacity: 0.8;
     }
+
+    .post-preview {
+        padding-bottom: 2rem;
+
+        h2 {
+            margin-top: 0;
+        }
+
+        .continue-reading {
+            opacity: 0;
+            transition: .2s;
+
+            @include media-small {
+                opacity: 1;
+            }
+        }
+        &:hover .continue-reading,
+        &:focus-within .continue-reading {
+            opacity: 1;
+        }
+    }
 }
 
 #toc {

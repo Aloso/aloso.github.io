@@ -143,6 +143,10 @@ pre:hover > code[data-lang]::before {
     }
 }
 
+.compact-list li p {
+    margin: 0;
+}
+
 
 .listingblock {
     > .title {
