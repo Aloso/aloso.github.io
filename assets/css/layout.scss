@@ -1,64 +1,39 @@
 ---
 ---
 
-@import url(syntax.css);
+// fonts
+$sans-serif: 'Nunito Sans', 'Noto Sans', 'Open Sans', 'Arial', sans-serif;
+$monospace: 'JetBrains Mono', 'Hack', 'Consolas', monospace;
+
+// colors
+$main-bg: #171717;
+$link-color: #73deff;
+$scrollbar: #555 #292929;
+$scrollbar-focused: #666 #292929;
+
+
+@mixin media-small {
+    @media (max-width: 700px) {
+        @content;
+    }
+}
+@mixin media-tiny {
+    @media (max-width: 500px) {
+        @content;
+    }
+}
+
+
+@import 'syntax.css';
+@import 'assets/css/asciidoc.scss';
+@import 'assets/css/language-labels.scss';
 
 html, body {
     margin: 0;
     font-size: 18px;
-    background-color: #171717;
+    background-color: $main-bg;
     color: white;
-    font-family: 'Nunito Sans', 'Noto Sans', 'Open Sans', 'Arial', sans-serif;
-}
-
-pre, code {
-    font-family: 'JetBrains Mono', 'Hack', 'Consolas', monospace;
-    font-variant-ligatures: none;
-}
-pre {
-    padding: 1rem;
-    margin: 1rem 0;
-    background-color: #222;
-    border-radius: 0.3rem;
-    line-height: 1.5;
-    overflow: auto;
-    scrollbar-color: #555 #292929;
-}
-pre:hover {
-    scrollbar-color: #666 #292929;
-}
-
-code {
-    padding: 0 0.2em;
-    background-color: #ffffff15;
-    border-radius: 5px;
-    font-size: 88%;
-    text-shadow: 1px 1px 0 #00000015;
-}
-
-pre > code {
-    padding: 0;
-    background-color: transparent;
-    font-size: inherit;
-}
-
-.colist {
-    margin-top: calc(2px - 1rem);
-    background-color: #222;
-    border-radius: 0.3rem;
-
-    > ol {
-        margin: 0 0 1rem 0;
-        padding: 0.5rem 0 0.5rem 2.2rem;
-
-        li::marker {
-            font-weight: bold;
-        }
-    
-        p {
-            margin: 0;
-        }
-    }
+    font-family: $sans-serif;
 }
 
 ::selection {
@@ -67,7 +42,7 @@ pre > code {
 }
 
 a {
-    color: #73deff;
+    color: $link-color;
     text-decoration: none;
 }
 
@@ -166,168 +141,6 @@ em {
     }
 }
 
-p {
-    line-height: 1.7em;
-    font-size: 1.2rem;
-    color: #e2e2e2;
-    letter-spacing: 0.01rem;
-    margin: 1.5em 0;
-}
-
-h1 {
-    font-size: 2.2rem;
-    line-height: 3rem;
-    padding-bottom: 2rem;
-}
-
-h2 {
-    font-size: 1.6rem;
-    line-height: 2.2rem;
-    margin: 1.7rem 0;
-    color: #ffc14f;
-}
-
-.post-title-link a {
-    color: inherit;
-}
-
-h3 {
-    font-size: 1.5rem;
-    line-height: 2.1rem;
-    margin: 1.7rem 0;
-}
-
-h4 {
-    font-size: 1.2rem;
-    line-height: 1.8rem;
-    margin: 1.7rem 0;
-}
-
-h5 {
-    font-size: 1.2rem;
-    line-height: 1.7rem;
-    margin: 1.5rem 0;
-    font-weight: bold;
-}
-
-blockquote {
-    margin-left: 0;
-    margin-right: 0;
-    padding: 0 1rem;
-    border-left: 0.3rem solid rgba(255, 255, 255, 0.3);
-    font-style: italic;
-}
-
-code[data-lang]::before {
-    float: right;
-    opacity: 0;
-    font-family: 'Nunito Sans', 'Noto Sans', 'Open Sans', 'Arial', sans-serif;
-    font-size: 90%;
-    margin: -0.5rem -0.3rem 0 1rem;
-    transition: 0.5s opacity;
-}
-
-pre:hover > code[data-lang]::before {
-    opacity: 0.5;
-}
-
-code[data-lang=rust]::before { content: "Rust" }
-
-code[data-lang=toml]::before { content: "Toml" }
-code[data-lang=json]::before { content: "JSON" }
-code[data-lang=yaml]::before, code[data-lang=yml]::before { content: "Yaml" }
-code[data-lang=md]::before, code[data-lang=markdown]::before { content: "Markdown" }
-code[data-lang=liquid]::before { content: "Liquid" }
-
-code[data-lang=js]::before, code[data-lang=javascript]::before { content: "JS" }
-code[data-lang=jsx]::before { content: "JSX" }
-code[data-lang=ts]::before, code[data-lang=typescript]::before { content: "TS" }
-code[data-lang=tsx]::before { content: "TSX" }
-code[data-lang=html]::before { content: "HTML" }
-code[data-lang=xhtml]::before { content: "XHTML" }
-code[data-lang=xml]::before { content: "XML" }
-code[data-lang=css]::before { content: "CSS" }
-code[data-lang=sql]::before { content: "SQL" }
-
-code[data-lang=sh]::before, code[data-lang=bash]::before, code[data-lang=fish]::before { content: "Shell" }
-code[data-lang=c]::before { content: "C" }
-code[data-lang=cpp]::before { content: "C++" }
-code[data-lang=csharp]::before { content: "C#" }
-code[data-lang=go]::before { content: "Go" }
-code[data-lang=haskell]::before { content: "Haskell" }
-code[data-lang=java]::before { content: "Java" }
-code[data-lang=kotlin]::before { content: "Kotlin" }
-code[data-lang=lua]::before { content: "Lua" }
-code[data-lang=ocaml]::before { content: "OCaml" }
-code[data-lang=perl]::before { content: "Perl" }
-code[data-lang=php]::before { content: "PHP" }
-code[data-lang=python]::before, code[data-lang=py]::before { content: "Python" }
-code[data-lang=ruby]::before { content: "Ruby" }
-code[data-lang=scala]::before { content: "Scala" }
-code[data-lang=swift]::before { content: "Swift" }
-
-pre .conum {
-    user-select: none;
-    pointer-events: none;
-    background-color: white;
-    color: black;
-    border-radius: 100px;
-    font-size: 90%;
-
-    &::before {
-        content: " ";
-        margin-right: -1ch;
-        background-color: white;
-        z-index: 1;
-        position: relative;
-        border-top-left-radius: 100px;
-        border-bottom-left-radius: 100px;
-    }
-    &::after {
-        content: " ";
-        margin-left: -1ch;
-        background-color: white;
-        z-index: 1;
-        position: relative;
-        border-top-right-radius: 100px;
-        border-bottom-right-radius: 100px;
-    }
-}
-
-.green {
-    color: #4dec4d;
-}
-
-.hint {
-    background-color: rgba(100, 185, 20, 0.2);
-    padding: 1.2rem 1.4rem;
-    border-radius: 0.3rem;
-
-    .title {
-        font-size: 1.2rem;
-        line-height: 1.8rem;
-        margin: 1rem 0;
-        font-weight: bold;
-    }
-
-    p {
-        color: white;
-        line-height: 1.5em;
-        font-size: 1.15rem;
-        color: white;
-        margin: 1.2rem 0;
-    }
-
-    > .title:first-child, > p:first-child,
-    > .content > .title:first-child, > .content > .paragraph:first-child > p {
-        margin-top: 0;
-    }
-
-    :last-child {
-        margin-bottom: 0;
-    }
-}
-
 #toc {
     font-size: 1.1rem;
 
@@ -348,69 +161,19 @@ pre .conum {
     }
 }
 
-ul li > p,
-.hint ul li > p {
+ul li > p {
   margin-top: 0;
   margin-bottom: 0;
 }
 
-#footnotes {
-    margin: 3rem 0 1rem 0;
-    font-size: 1.1rem;
-
-    hr {
-        border: none;
-        border-top: 1px solid #555;
-        margin-bottom: 0.5rem;
-
-        &::after {
-            content: "Footnotes";
-            color: white;
-            display: block;
-            margin: 0.5rem 0;
-            font-weight: bold;
-        }
-    }
-
-    .footnote {
-        padding-left: 2.2rem;
-
-        > a:first-child {
-            font-weight: bold;
-            margin-left: -2.2rem;
-            font-family: 'JetBrains Mono', 'Hack', 'Consolas', monospace;
-            padding: 0.2rem 0;
-
-            &::before {
-                content: "↑";
-                padding: 0 0.2rem;
-            }
-        }
-    }
-}
-
-@media (max-width: 700px) {
+@include media-small {
     html, body {
         font-size: 16px;
     }
-
-    #toc ul ul {
-        display: none;
-    }
-
-    code[data-lang]::before {
-        display: none;
-    }
 }
 
-@media (max-width: 500px) {
+@include media-tiny {
     html, body {
         font-size: 15px;
-    }
-
-    pre, .colist {
-        margin-left: -1rem;
-        margin-right: -1rem;
-        border-radius: 0;
     }
 }

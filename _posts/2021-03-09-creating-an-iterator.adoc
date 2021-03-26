@@ -71,7 +71,7 @@ This allows us to iterate over the items. However, `Node` still doesn't implemen
 
 As we will see shortly, implementing this trait is quite tricky in this case. The reason for this is that the `Iterator` trait provides _external iteration_, whereas our `traverse` method provides _internal iteration_.
 
-[.hint]
+[TIP]
 .External and internal iteration
 --
 Internal iteration means that a closure is passed to a function, which calls the closure for every element. This means that the iterator function has full control over the iteration.
@@ -99,7 +99,7 @@ The iterator trait is usually not implemented for a collection _directly_. Inste
 struct NodeIter<'a, It>(&'a Node<It>);
 ----
 
-[.hint]
+[TIP]
 .Why not implement `Iterator` for the collection?
 --
 This great question was asked recently on Reddit. One reason is, if the collection implemented the `Iterator` type directly, the collection could be modified during iteration, which is is error-prone and usually undesired. It would also make it impossible to have multiple iterators that iterate over the same collection simultaneously and independently from each other, because the `Iterator::next()` method borrows the iterator mutably.
@@ -210,7 +210,7 @@ impl<It> Default for NodeIter<'_, It> {
 }
 ----
 
-[.hint]
+[TIP]
 .The `mem::take()` function
 --
 https://doc.rust-lang.org/std/mem/fn.take.html[`mem::take()`] replaces a mutable reference with its default value and returns the previous value. The previous value is effectively _moved out_ of the reference. We use it here to convert `&mut self` to an owned value, because `parent` must be owned.
@@ -403,7 +403,7 @@ Collections usually also have an iterator for mutating the items. They can be pa
 
 But because this blog post is already way too long, I leave this part as an exercise to the reader. 😛
 
-[.hint]
+[TIP]
 .How to borrow multiple things from a slice mutably?
 --
 Getting multiple mutable references into a slice isn't easy.

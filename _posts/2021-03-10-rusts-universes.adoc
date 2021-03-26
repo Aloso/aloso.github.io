@@ -8,7 +8,7 @@ author: Ludwig Stecher
 
 This post describes a curious feature of Rust: Namespaces, also called universes. Note that Rusts namespaces are nothing like namespaces in languages such as TypeScript or C♯; they are also unrelated to all of space and time, although there are certainly parallels.
 
-[.hint]
+[TIP]
 --
 It was pointed out that nobody actually calls them universes. The reason I thought that is the following quote from the https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/enum.Namespace.html[rustc documentation]:
 
@@ -67,8 +67,10 @@ mod wtf {}  // this is allowed‽
 
 Why is that? the function `wtf` and the constant `wtf` both live in the same namespace, therefore their names clash. The module `wtf` however lives in a different namespace, so it can coexist with a function or constant of the same name. One might say, it's in a parallel universe.
 
-[.hint]
+[TIP]
+--
 Note that constants are usually written in UPPER_CASE, so functions and constants can't clash in idiomatic code. I wrote the above code just to prove a point, please don't quote me on it. 😉
+--
 
 So you're probably wondering, how many namespaces are there? Let's look in the https://archive.is/ajZHM[documentation of the rustc source]! There are 3:
 
@@ -119,8 +121,10 @@ fn Foo(_0: Bar) -> Foo {
 }
 ----
 
-[.hint]
+[TIP]
+--
 This isn't valid Rust syntax, but that's not a problem for the compiler, because the transformation happens internally, after the code was already parsed.
+--
 
 So this is why tuple structs can be both used as a type and invoked like a function. However, it also means that tuple structs occupy both the type namespace and the value namespace. Roughly the same happens with enum variants with round brackets. Furthermore, unit structs and unit-like enum variants expand to a type name and a value (a constant), so they also occupy both namespaces.
 
@@ -144,10 +148,10 @@ How does that work? Let's start with the obvious ones: `a` and `h` are functions
 
 That only leaves `e`, `f` and `G`. Since `e` and `f` are immediately followed by two colons (called the _scoping operator_), they must be in the type namespace. That makes sense, because types, traits and modules are in the type namespace. `G` however is followed by a dot, so it is parsed as a value.
 
-[.hint]
+[TIP]
 .Note about const generics
 --
-A restricted version of const generics are https://blog.rust-lang.org/2021/02/26/const-generics-mvp-beta.html[about to be released] in stable Rust. This will introduce an ambiguity in the parser: In the expression `foo::<X>()`, the `X` can be both a type and a value.
+Recently, a https://github.com/rust-lang/rust/blob/HEAD/RELEASES.md#version-1510-2021-03-25[MVP of const generics was stabilized]. This introduced an ambiguity in the parser: In the expression `foo::<X>()`, the `X` can be both a type and a value.
 
 Rust resolves this ambiguity by preferring the type when there is both a type `X` and a value `X` in scope. If that is incorrect and the function expects a value, it must be wrapped in curly braces, i.e. `foo::<{&nbsp;X&nbsp;}>()`.
 --

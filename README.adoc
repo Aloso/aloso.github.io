@@ -39,21 +39,21 @@ The front matter is the first block of a post, enclosed in `---` characters.
 
 Theses pages go in the root directory. They must also be mentioned in the `_data/navigation.yml` file if they should appear in the header.
 
-=== Green boxes
+=== Colorful boxes
 
 [source, adoc]
 -----
-[.hint]
+[TIP]
 .A title
 --
-A block with the `hint` CSS class
+A block with a lightbulb and the `tip` CSS class
 --
 -----
 
-[.hint]
+[TIP]
 .A title
 --
-A block with the `hint` CSS class
+A block with a lightbulb and the `tip` CSS class
 --
 
 === Code blocks containing markup, links, footnotes, etc.
