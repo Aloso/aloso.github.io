@@ -409,7 +409,7 @@ But because this blog post is already way too long, I leave this part as an exer
 Getting multiple mutable references into a slice isn't easy.
 One way is to create a mutable iterator with `.iter_mut()`. Also there's a number of methods to help you out:
 
-[.compact-list]
+[.compact]
 - https://doc.rust-lang.org/std/primitive.slice.html#method.split_at_mut[`split_at_mut`]
 - https://doc.rust-lang.org/std/primitive.slice.html#method.split_first_mut[`split_first_mut`]
 - https://doc.rust-lang.org/std/primitive.slice.html#method.split_last_mut[`split_last_mut`]

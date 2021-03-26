@@ -131,7 +131,7 @@ pre:hover > code[data-lang]::before {
     flex-wrap: wrap;
     align-items: stretch;
     gap: 0 20px;
-    
+
     > * {
         flex-basis: calc(50% - 10px);
         flex-shrink: 1;
@@ -143,7 +143,11 @@ pre:hover > code[data-lang]::before {
     }
 }
 
-.compact-list li p {
+li > p {
+    margin: 0.667rem 0;
+}
+
+.compact li > p {
     margin: 0;
 }
 
@@ -320,7 +324,7 @@ details summary {
     &:hover {
         scrollbar-color: $scrollbar-focused;
     }
-    
+
     > .content {
         min-width: 450px;
 

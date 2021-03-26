@@ -31,6 +31,7 @@ Links are written as `+https://www.example.com[Link text]+`. Footnotes are writt
 
 The front matter is the first block of a post, enclosed in `---` characters.
 
+[.compact]
 - Make sure that the date in the front matter matches the date in the file name.
 - Add `show_meta: true` to include publication date, time to read and table of contents
 - Add `excerpt_separator: // END OF EXCERPT` to specify where the excerpt should end. If omitted, the excerpt is the first paragraph.

@@ -74,12 +74,14 @@ Note that constants are usually written in UPPER_CASE, so functions and constant
 
 So you're probably wondering, how many namespaces are there? Let's look in the https://archive.is/ajZHM[documentation of the rustc source]! There are 3:
 
+[.compact]
 - The _type namespace_
 - The _value namespace_
 - The _macro namespace_
 
 Which items are part of which namespace is specified https://archive.is/OZM8P[here] in the `DefKind` type:
 
+[.compact]
 - The _type namespace_ contains
     * modules
     * structs
