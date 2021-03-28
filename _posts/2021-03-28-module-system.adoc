@@ -189,6 +189,8 @@ A module contains _items_. Items are
 
 You can refer to items by their _path_. For example, the path `foo::bar::Baz` refers to the `Baz` item within the `bar` item within the `foo` item. Paths are usually relative: To use `foo::bar::Baz`, the `foo` item must be available in the current scope; absolute paths (starting at the root module) are prefixed with `crate::`. A `super::` path segment changes to the parent module (similar to `../` in the file system).
 
+_Imports_ are used to shorten paths. Instead of having to write `foo::bar::Baz` every time, we can write `use foo::bar::Baz;` once. This brings the item into scope, so we can refer to it with the much shorter path `Baz`.
+
 [TIP]
 .Changes to paths in the 2018 edition
 --
@@ -267,7 +269,7 @@ pub(crate) mod foo {
 }
 ----
 
-When something is visible in one module, it is also visible in all its child modules. It still needs to be imported though:
+When something is visible in one module, it is also visible in all its child modules. It still needs to be imported (or referred to with its path) though:
 
 [source, rust]
 ----
@@ -331,7 +333,7 @@ The visibility of an item is like an _upper bound_, it can't be increased with r
 However, a public item might not be reachable from outside the crate, if it's in a private module and isn't publicly re-exported. To make an item available in the crate root, it's not enough to make it public; we also need to make it reachable from the crate root.
 
 Don't confuse _visibility_ with _availability_.::
-Visibility means that we are principally allowed to use an item somewhere. It doesn't mean that the item is available, i.e. _in scope_, so we might still have to import it.
+Visibility means that we are principally allowed to use an item somewhere. It doesn't mean that the item is available, i.e. _in scope_, so we might still have to import it (or refer to it with its path).
 
 == Special cases
 
