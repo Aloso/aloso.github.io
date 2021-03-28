@@ -8,7 +8,7 @@ author: Ludwig Stecher
 
 The Rust programming language can be confusing for beginners, and the module system is one part that causes frustration particularly often. There are quite a few blog posts out there trying to explain the module system in a simple way, but I often have the feeling that they over-simplify things. So here's my take--a more detailed explanation of the module system.
 
-This post assumes that you can write a "`hello world`" Rust program. It's a rather long read, so get comfortable, maybe with a cup of tea, hot chocolate, or whatever your heart desires 😊
+This post assumes that you can write at least a "`hello world`" Rust program. It's a rather long read, so get comfortable, maybe with a cup of tea, hot chocolate, or whatever your heart desires 😊
 
 == Why do modules exist?
 
