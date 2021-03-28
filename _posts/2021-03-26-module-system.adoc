@@ -4,7 +4,6 @@ title: Rusts Module System Explained
 show_meta: true
 date: 2021-03-26
 author: Ludwig Stecher
-published: false
 ---
 
 Rust can be confusing for beginners, and the module system is one part that causes confusion particularly often. There are lots of blog posts out there trying to explain the module system in a simple way, but I often have the feeling that they over-simplify things. So here's my take--a more detailed explanation of the module system, with lots of examples. It's a rather long read, so get comfortable, maybe with a cup of tea, hot chocolate, or whatever your heart desires 😊
@@ -14,7 +13,7 @@ Rust can be confusing for beginners, and the module system is one part that caus
 Modules give your code _structure_: Dividing your code into modules is like dividing your house into several rooms: Each room has a different purpose, and rooms can be locked for privacy.
 
 [.medium]
-.Floor plan of the Schmidt-Lademann House. https://commons.wikimedia.org/wiki/File:Schmidt-Lademann_house_floor_plan.png[Source] (modified; https://creativecommons.org/licenses/by-sa/4.0/deed.en[license])
+.Floor plan. https://commons.wikimedia.org/wiki/File:Schmidt-Lademann_house_floor_plan.png[Source] (modified; https://creativecommons.org/licenses/by-sa/4.0/deed.en[license])
 image::2021-03-26-floor-plan.png[Floor plan]
 
 == The module tree
@@ -31,11 +30,67 @@ mod normal;
 // the content is in another file
 ----
 
-When the module is not inline, Rust looks for the content of the module in another file, either `module_name.rs` or `module_name/mod.rs`, where `module_name` is the name of the module. This might seem odd if you're used to languages where modules don't need to be explicitly declared, like JavaScript.
+When the module is not inline, Rust looks for the content of the module in another file, either `[.no-yellow]_module_name_.rs` or `[.no-yellow]_module_name_/mod.rs`. It might seem odd that we have to declare modules explicitly (unlike in JavaScript, where modules are inferred from the file system). However, there's a good reason for this, as we'll see later.
+
+Like every tree, the module tree has a _root_. This is the file `lib.rs` in case of a library crate, or the file `main.rs` in case of a binary crate footnote:[A crate can also have multiple targets (library, binary, example, test, and benchmark targets), in which case each target has its own root. You can read more about this https://doc.rust-lang.org/cargo/reference/cargo-targets.html[here].].
+
+=== Submodules
+
+Unfortunately, Rust is not the most consistent language when it comes to modules: There are two different ways to structure a module tree, and they can be mixed within the same crate.
+
+Say we have a library crate with a module `parent`, which contains a sub-module `child`:
+
+[.file-tree, source, subs="+macros,+quotes"]
+----
+└─ [folder]*library root*
+   └─ [file]*parent*
+      └─ [file]*child*
+----
+
+The crate root is in a `lib.rs` file in the `src` directory. However, the `parent` module can be either in a `parent.rs` file next to `lib.rs`, or in a `mod.rs` file in a `parent` directory:
+
+[.flex]
+--
+[.file-tree, source, subs="+macros,+quotes"]
+.File tree A
+----
+├─ [file]*Cargo.toml*
+└─ [folder]*src/*
+   ├─ [file]*lib.rs*
+   ├─ [file]*parent.rs*  // parent module
+   └─ [folder]*parent/*
+      └─ [file]*child.rs*
+----
+
+[.file-tree, source, subs="+macros,+quotes"]
+.File tree B
+----
+├─ [file]*Cargo.toml*
+└─ [folder]*src/*
+   ├─ [file]*lib.rs*
+   └─ [folder]*parent/*
+      ├─ [file]*mod.rs*  // parent module
+      └─ [file]*child.rs*
+----
+--
+
+It doesn't really matter which way you go, just do what you prefer. I use the first way ("`File tree A`"), since it's easier to add sub-modules. For example, if you want to add a submodule to `child`, you just need to create a folder and a new file:
+
+[.file-tree, source, subs="+macros,+quotes"]
+----
+ ├─ [file]*Cargo.toml*
+ └─ [folder]*src/*
+    ├─ [file]*lib.rs*
+    ├─ [file]*parent.rs*
+    └─ [folder]*parent/*
+       ├─ [file]*child.rs*
+[.diffadd]##      └─ [folder]*child/*##
+[.diffadd]##          └─ [file]*grand_child.rs*##
+----
 
 [TIP]
 --
-The file name can be specified explicitly, so the module name can be different from the file name:
+The path of a module can also be specified explicitly:
 
 [source, rust]
 #[path = "./bar.rs"]
@@ -43,14 +98,11 @@ mod foo;
 
 --
 
-Like every tree, the module tree has a _root_. This is the file `lib.rs` in case of a library crate, or the file `main.rs` in case of a binary crate. A crate can also have multiple targets (library, binary, example, test, and benchmark targets), in which case each target has its own root. You can read more about this https://doc.rust-lang.org/cargo/reference/cargo-targets.html[here].
+=== An example
 
-== An example
+Hopefull this will make more sense once you see an example. Here's the module structure of a simple library crate:
 
-Here's the module structure of a simple library crate:
-
-[.file-tree]
-[source, subs="+macros,+quotes"]
+[.file-tree, source, subs="+macros,+quotes"]
 ----
 ├─ [file]*Cargo.toml*
 └─ [folder]*src/*
@@ -126,9 +178,9 @@ No worries if you don't understand everything here! All the concepts that are us
 
 A module contains _items_. Items are
 
+[.compact]
 - Functions
-- Structs, enums and unions
-- Type aliases
+- Types (structs, enums, unions, type aliases)
 - Traits
 - Impl blocks
 - Macros
@@ -139,12 +191,12 @@ A module contains _items_. Items are
 - Modules
 - Associated items (not important right now)
 
-You can refer to items by their _path_. For example, the path `foo::bar::Baz` refers to an item `Baz` within `bar` within a module `foo`. Paths are relative to the current module; absolute paths (relative to the root module) start with `crate::`. A `super::` path segment changes to the parent module, similar to `../` in file systems.
+You can refer to items by their _path_. For example, the path `foo::bar::Baz` refers to an item `Baz` within `bar` within a module `foo`. Paths are usually relative: To use `foo::bar::Baz`, the `foo` module must be available in the current scope; absolute paths (relative to the root module) start with `crate::`. A `super::` path segment changes to the parent module, similar to `../` in file systems.
 
 [TIP]
 .Changes to paths in the 2018 edition
 --
-Prior to the 2018 edition, it was common to start absolute paths with `::`, so `::foo` is an absolute path whereas `foo` is a relative path. This is still possible, but no longer recommended.
+Prior to the 2018 edition, it was common to start absolute paths with just `::` instead of `crate::`. This is still possible, but no longer recommended.
 
 The 2018 edition also changed how external crates are used: In the 2015 edition, to use an external crate, an `extern crate` declaration was needed. This is no longer required in most cases: Just put dependencies in your `Cargo.toml`, and you can use them right away.
 --
@@ -158,41 +210,27 @@ _Visibility_, or _privacy_, is the concept of making parts of a module inaccessi
 This concept exists in many programming languages. However, in most object-oriented languages, the privacy boundary is the _class_, whereas in Rust, the modules are privacy boundaries.
 --
 
-Most things are private by default. To make something public, the `pub` keyword is written before it. This makes the item accessible everywhere:
+In Rust, most things are private by default. To make something public, the `pub` keyword is written before it. This makes the item accessible everywhere:
 
 [source, rust]
 .lib.rs
 ----
-// root module
-
-mod private {
-    pub mod a {
-        pub struct Foo;
-        fn foo() {}
+mod foo {  <1>
+    pub mod bar {
+        struct Baz;
     }
-
-    mod b {
-        pub fn bar() {}
-    }
-    
-    pub use b::bar;
+    // use bar::Baz;  <2>
 }
+
+use foo::bar;  <3>
 ----
+<1> This declares a private module, so it can only be used within this root module. It can't be accessed from another crate.
+<2> If we uncommented this, it would fail to compile. `Baz` is private, therefore it can only be used within the `bar` module.
+<3> The module `bar` can be used here, because it is declared as public. This is somewhat counter-intuitive, since the `foo` module is private. But when a module is private, it can still be accessed within its direct parent module, since a module is just like any other item.
 
-[NOTE]
---
-For simplicity, I won't write the file name over every code snippet from now on. If no file name is specified, assume that it's the crate root (`lib.rs` or `main.rs`).
---
+=== Fine-grained visibility
 
-`mod private` declares a private module, so it can only be used within the root module, because that's where it is declared. `a` is public, however, so `private::a` can be accessed from the root module. But `mod b` is private, so trying to use `private::b` won't compile.
-
-The module `a` contains two items, a public struct and a private function. So the struct `private::a::Foo` is visible in the root module, but the function `foo` is only visible within the module `a`.
-
-So far, so good... right? Now comes the tricky part.
-
-== Fine-grained visibility
-
-Items can be private or public (`pub`). However, there are also visibilities in-between: Most notably, an item can be declared as `pub(crate)`. This means that it is visible _within the current crate_, but not outside. With `pub(super)`, an item is visible within the parent module. With `pub(in path)`, visibility can also be limited to any other module as well:
+Items can be private or public. However, there are also visibilities in-between: Most notably, an item can be declared as `pub(crate)`. This means that it is visible _within the current crate_, but not outside. With `pub(super)`, an item is visible within the parent module. With `pub(in [.no-yellow]_path_)`, visibility can also be limited to any other module as well:
 
 [source, rust]
 ----
@@ -202,17 +240,30 @@ pub(crate) mod foo {
 }
 ----
 
+When something is visible in one module, it is also visible in all its child modules. It still needs to be imported though:
+
+[source, rust]
+----
+struct Foo;
+// Foo is visible in this module
+
+mod inner {
+    use super::Foo;
+    // Foo is also visible here!
+}
+----
+
 === Visibilities overview
 
-[min-width]
+[.min-width]
 --
 [.fancy, options=autowidth]
 |======================
-|`pub`                |The item is public everywhere
-|`pub(crate)`         |The item is public in the current crate
-|`pub(super)`         |The item is public in the parent module
-|`pub(in&nbsp;some::path)` |The item is public in the specified path. The path must refer to an ancestor module of the item.
-|`pub(self)`          |The item is private, since `self` refers to the current module. This is equivalent to omitting the visibility entirely.
+|`pub`                |The item is visible everywhere
+|`pub(crate)`         |The item is visible in the current crate
+|`pub(super)`         |The item is visible in the parent module
+|`pub(in&nbsp;some::path)` |The item is visible in the specified path. The path must refer to an ancestor module of the item.
+|`pub(self)`          |The item is private, i.e. visible only in the same module. This is equivalent to omitting the visibility entirely.
 |======================
 --
 
@@ -221,6 +272,7 @@ pub(crate) mod foo {
 With `use` declarations, items can be _re-exported_ from a different module than the one they were declared in. A re-exported item has multiple paths that refer to the same thing. For example:
 
 [source, rust]
+.lib.rs
 ----
 pub mod answer {
     pub const ANSWER: i32 = 42;
@@ -228,9 +280,10 @@ pub mod answer {
 pub use answer::ANSWER;
 ----
 
-Now `ANSWER` can be referred to as either `crate::ANSWER` or `crate::answer::ANSWER`. However, not every path is always reachable. Take, for example:
+Now `ANSWER` can be referred to as either `crate::ANSWER` or `crate​::answer::ANSWER`. However, not every path is always reachable. Take, for example:
 
 [source, rust]
+.lib.rs
 ----
 mod answer {
     pub const ANSWER: i32 = 42;
@@ -238,8 +291,18 @@ mod answer {
 pub use answer::ANSWER;
 ----
 
-`crate::answer::ANSWER` is public, but it can't be used from outside the crate, because the `answer` module is private. Only the re-export `crate::ANSWER` can be used from outside the crate.
+`crate​::answer::ANSWER` is public, but it can't be used from outside the crate, because the `answer` module is private. Only the re-export `crate::ANSWER` can be used from outside the crate.
 
-=== Rules about visibility and re-exporting
+== Common pitfalls
 
-When an item isn't exported from a private module, it is _effectively_ private, even if it is declared as public. The visibility of an item is like an _upper bound_, it can't be extended with re-exports. For example, you can't re-export a private struct outside of its module.
+Don't confuse _visibility_ with _reachability_.:: The visibility of an item is like an _upper bound_, it can't be increased with re-exports. For example, you can't re-export a private struct outside of its module.
++
+However, a public item might not be reachable from outside the crate, if it's in a private module and isn't publicly re-exported. To make an item available in the crate root, it's not enough to make it public; you also need to make it reachable from the crate root.
+
+Don't confuse _visibility_ with _availability_.:: Visibility means that you are principally allowed to use an item somewhere. It doesn't mean that the item is available, i.e. _in scope_, so you might still have to import it.
+
+Macros have different rules.:: Declarative macros (the ones that are declared with `macro_rules!`) behave more like local variables within a function than like items in some regards. For example, they can be shadowed, they have to be declared before they can be used, and they don't need to be explicitly imported in child modules.
++
+And, they can't be declared public. The `#[macro_export]` attribute can be added to a macro, which exports it publicly at the crate root. This can be undesired, however, if it's not supposed to be part of the public API; there is no equivalent of `pub(crate)` for macros.
++
+One workaround for this is to put your macros in a module and annotate the module with `#[macro_use]`. The module should be the _first module declaration_ in the crate root. This ensures that the macros can be used everywhere in your crate, but not outside of the crate. Not the most elegant solution, but it works.

@@ -51,7 +51,7 @@ a:hover {
     text-underline-offset: 0.35rem;
 }
 
-em {
+em:not(.no-yellow) {
     color: #ffda73;
 }
 
@@ -144,7 +144,7 @@ em {
         padding-bottom: 2rem;
 
         h2 {
-            margin-top: 0;
+            margin-top: 0.4rem;
         }
 
         .continue-reading {
