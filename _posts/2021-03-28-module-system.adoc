@@ -390,6 +390,6 @@ One workaround for this is to put our macros in a module and annotate the module
 
 I hope you liked this post! Please let me know if you found this article useful; were there any things that were unclear or confusing? I'll try to improve it over time.
 
-Discussion on Reddit. You can also open an issue in the https://github.com/Aloso/aloso.github.io/issues[issue tracker].
+Discussion on https://www.reddit.com/r/rust/comments/mf2you/rusts_module_system_explained/[Reddit]. You can also open an issue in the https://github.com/Aloso/aloso.github.io/issues[issue tracker].
 
 Until next time!
