@@ -1,0 +1,59 @@
+---
+layout: default
+title: It's time
+show_meta: true
+date: 2021-03-29
+author: Ludwig Stecher
+excerpt_separator: // END OF EXCERPT
+---
+
+What is time? A physician might say, the universe has three spacial dimensions and one temporal dimension. Time can be measured in various time units, such as seconds, minutes and hours. We're all travelling through time at a constant velocity of 1 second per second.
+
+But when dealing with time, we're usually not talking about physics. Instead, we're talking about imprecise time units such as calendar days, months and years, with weird corner cases such as lapse years. We're talking about times of day, using different time zones. Sometimes, we're even using different calendar systems.
+
+// END OF EXCERPT
+
+For a programmer, this topic has many challenges. In this blog post I'll explain some of the more confusing parts of our calendar, and how this is handled in Rust with the `chrono` library.
+
+== Basics
+
+=== The second
+
+The SI basic unit for time is a second. Historically, it was defined as ^1^/~86400~ of a day (since a day is 24 hours, an hour is 60 minutes, and a minute is 60 seconds, a day is 24 · 60 · 60 = 86400 seconds). Nowadays (since 1967) it has a more precise definition:
+
+> The second is defined as being equal to the time duration of 9 192 631 770 periods of the radiation corresponding to the transition between the two hyperfine levels of the fundamental unperturbed ground-state of the caesium-133 atom.
+
+The exact definition isn't important unless you're a physicist. But you can keep in mind that the duration of a second is _universal and exact_. It doesn't depend on the planet you're on or its current rotational momentum.
+
+This is important because the earth doesn't always rotate with the same speed. Its rotation speed is influenced by seismic activity and even by weather. Even though these deviations are miniscule, clocks (which assume that every day has 86400 seconds) can become out of sync over time. So every few years, a _leap second_ is added to account for these deviations.
+
+There's no way to predict when a leap second is added, since earth's rotation speed is irregular, so leap seconds are added on an as-needed basis. For example, between 1972 and 1998, there was a leap second almost every year. Since then, they have gotten more rare.
+
+=== The day
+
+There are different definitions of a day that are relevant here: There's the _civil day_, which usually consists of 86400 seconds. When the day has a leap second, it is 86401 seconds. In time zones with daylight saving, a day can also have 23 or 25 hours when transitioning between summer time and winter time.
+
+The civil day approximates the mean _solar day_. A solar day is the time the earth takes for a full rotation relative to the sun. In other words, it's the length of time which elapses between the sun reaching its highest point in the sky two consecutive times.
+
+The solar day should not be confused with the _sidereal day_: A sidereal day is the time the earth takes for a full rotation relative to the fixed stars. A sidereal day is slightly shorter than a solar day, because in addition to the earth's rotation around itself, it also rotates around the sun. So while a solar day has roughly 86400 seconds, a sidereal day has about 86164 seconds. However, when we talk about days, we usually mean solar days or civil days.
+
+=== The year
+
+A year is the earth's orbital period, i.e. the time it takes for the earth to rotate around the sun. Like for days, there are also different definitions of what a year is. Let's look at some of them:
+
+The simplest definition is that of the _calendar year_, which is whatever the calendar says. Nowadays, most regions use the https://en.wikipedia.org/wiki/Gregorian_calendar[Gregorian calendar], where a year is either 365 or 366 civil days. We'll talk more about calendars later.
+
+The next kind of year is the _tropical year_. It is defined as the time for the mean ecliptic longitude of the Sun to increase by 360 degrees. The tropical year comprises a full cycle of the seasons. The Gregorian calendar year tries to approximate the tropical year: Its average length of 365.2425 days is very close to the average length of a tropical year, 365.24219 solar days.
+
+The sidereal year is the time taken by the Earth to orbit the Sun once with respect to the fixed stars. Due to the https://en.wikipedia.org/wiki/Axial_precession[precession of the equinoxes], it is slightly longer than the tropical year: About 365.25636 solar days.
+
+[TIP]
+--
+What about the light year? The light year is not a unit of time, but a unit of length: It's the distance that light travels in vacuum in one year.
+
+So you might wonder, which definition of a "`year`" is used for this? It's the _Julian year_, i.e. the average length of a year in the Julian calender: _365.25 days_.
+
+This seems odd at first. Why use such an outdated, imprecise definition? But it makes sense: There is no single, perfect definition of a year, so you might as well use the definition that is easiest to use. The number of days in a Julian century is even a whole number: 36525 days. This makes astronomical calculations much easier.
+--
+
+=== Calendar systems
