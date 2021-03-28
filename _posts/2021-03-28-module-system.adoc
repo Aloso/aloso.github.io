@@ -96,7 +96,7 @@ The path of a module can also be specified explicitly with the https://doc.rust-
 
 === An example
 
-Hopefull this will make more sense once you see an example. Here's the module structure of a library crate:
+Hopefully this will make more sense once you see an example. Here's the module structure of a library crate:
 
 [.file-tree, source, subs="+macros,+quotes"]
 ----
@@ -356,7 +356,7 @@ enum FooImpl {
 }
 ----
 
-Also, when an enum variant has multiple fields, it's usually better to put them in a separate struct, so it's possible to make the fields public or make the struct `non_exhaustive`:
+Also, when an enum variant has multiple fields, it's usually better to put them in a separate struct, so it's possible to make the fields private or make the struct `non_exhaustive`:
 
 [source, rust]
 ----
