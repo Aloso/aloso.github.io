@@ -183,7 +183,7 @@ h1 {
 }
 
 h2 {
-    font-size: 1.6rem;
+    font-size: 1.7rem;
     line-height: 2.2rem;
     margin: 1.5em 0;
     color: #ffc14f;
@@ -229,6 +229,10 @@ details summary {
     &:hover {
         color: $link-color;
     }
+}
+
+dt + dd {
+    margin-top: -0.5rem;
 }
 
 .min-width {
@@ -284,7 +288,7 @@ td.tableblock > p {
     hr {
         border: none;
         border-top: 1px solid #555;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0;
 
         &::after {
             content: "Footnotes";
@@ -296,6 +300,7 @@ td.tableblock > p {
     }
 
     .footnote {
+        margin-top: 0.5rem;
         padding-left: 2.2rem;
 
         > a:first-child {

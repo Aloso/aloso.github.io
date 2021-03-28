@@ -143,7 +143,7 @@ struct NodeIter<'a, It> {
 }
 ----
 
-The `children` field contains the remaining children of a node, the `parent` field is the iterator of the parent node, if present. It must be wrapped in a `Box` because a struct in Rust can't contain itself without indirection – otherwise, it would be impossible to compute its size on the stack.
+The `children` field contains the remaining children of a node, the `parent` field is the iterator of the parent node, if present. It must be wrapped in a `Box` because a struct in Rust can't contain itself without indirection--otherwise, it would be impossible to compute its size on the stack.
 
 So how does this work? When we create the iterator, we put the node into the `children` slice and set `parent` to `None`:
 
