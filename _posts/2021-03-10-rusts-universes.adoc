@@ -1,12 +1,12 @@
 ---
 layout: default
-title: Rusts Universes
+title: Rust's Universes
 show_meta: true
 date: 2021-03-10
 author: Ludwig Stecher
 ---
 
-This post describes a curious feature of Rust: Namespaces, also called universes. Note that Rusts namespaces are nothing like namespaces in languages such as TypeScript or C♯; they are also unrelated to all of space and time, although there are certainly parallels.
+This post describes a curious feature of Rust: Namespaces, also called universes. Note that Rust's namespaces are nothing like namespaces in languages such as TypeScript or C♯; they are also unrelated to all of space and time, although there are certainly parallels.
 
 [TIP]
 --
@@ -132,7 +132,7 @@ So this is why tuple structs can be both used as a type and invoked like a funct
 
 == Resolving names from different namespaces
 
-Rusts syntax is designed to be unambiguous about the namespace in which the names live. It distinguishes between type positions and value positions, for example:
+Rust's syntax is designed to be unambiguous about the namespace in which the names live. It distinguishes between type positions and value positions, for example:
 
 [source, rust]
 ----
