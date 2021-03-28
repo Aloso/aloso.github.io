@@ -298,7 +298,7 @@ mod inner {
 
 == Exports
 
-With `use` declarations, items can be _re-exported_ from a different module than the one they were declared in. A re-exported item has multiple paths that refer to the same thing. For example:
+With `pub use` declarations, items can be _re-exported_ from a different module than the one they were declared in. A re-exported item has multiple paths that refer to the same thing. For example:
 
 [source, rust]
 .lib.rs
