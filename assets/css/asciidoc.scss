@@ -212,6 +212,41 @@ h5 {
     font-weight: bold;
 }
 
+h1, h2, h3, h4, h5 {
+    a.anchor, .anchor a {
+        display: inline-block;
+        width: 0;
+        height: 0;
+        vertical-align: top;
+        font-size: 67%;
+        font-weight: normal;
+
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .2s;
+
+        &::before {
+            content: "🔗︎";
+            padding-right: 6px;
+            margin-left: -1.5em;
+            width: 1.5em;
+            display: inline-block;
+            filter: brightness(2);
+            opacity: 0.45;
+        }
+
+        &:hover::before {
+            opacity: 0.6;
+        }
+    }
+
+    &:hover a.anchor, &:hover .anchor a {
+        opacity: 1;
+        pointer-events: initial;
+        text-decoration: none;
+    }
+}
+
 blockquote {
     margin-left: 0;
     margin-right: 0;

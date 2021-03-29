@@ -15,9 +15,9 @@ But when dealing with time, we're usually not talking about physics. Instead, we
 
 For a programmer, this topic has many challenges. In this blog post I'll explain some of the more confusing parts of our calendar, and how this is handled in Rust with the `chrono` library.
 
-== Basics
+== [.anchor]#xref:basics[ ]Basics#
 
-=== The second
+=== [.anchor]#xref:the-second[ ]The second#
 
 The SI basic unit for time is a second. Historically, it was defined as ^1^/~86400~ of a day (since a day is 24 hours, an hour is 60 minutes, and a minute is 60 seconds, a day is 24 · 60 · 60 = 86400 seconds). Nowadays (since 1967) it has a more precise definition:
 

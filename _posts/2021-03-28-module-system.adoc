@@ -382,7 +382,7 @@ pub struct FooVariant {
 
 Declarative macros (the ones that are declared with `macro_rules!`) behave more like local variables within a function than like items in some regards. For example, they can be shadowed, they have to be declared before they can be used, and they don't need to be explicitly imported in child modules footnote:[This is called "`textual scoping`". Actually, macros can have both a textual scope (like local variables) and a path-based scope (like items); the rules for this are https://doc.rust-lang.org/reference/macros-by-example.html#scoping-exporting-and-importing[quite complicated].].
 
-And, they can't be declared public. The `#[macro_export]` attribute can be added to a macro, which exports it publicly at the crate root. This can be undesired, however, if it's not supposed to be part of the public API; there is no equivalent of `pub(crate)` for macros.
+And, they can't be declared public. The `#[macro_export]` attribute can be added to a macro, which exports it publicly at the crate root. This can be undesirable, however, if it's not supposed to be part of the public API; there is no equivalent of `pub(crate)` for macros.
 
 One workaround for this is to put our macros in a module and annotate the module with `#[macro_use]`. The module should be the _first module declaration_ in the crate root. This ensures that the macros can be used everywhere in our crate, but not outside of the crate. Not the most elegant solution, but it works.
 
