@@ -47,5 +47,24 @@
         </div>
     </div>
     {% include footer.html %}
+
+    {% if page.show_meta %}
+    <script>
+        for (const heading of document.querySelectorAll('h1,h2,h3,h4,h5,h6')) {
+            const id = heading.id;
+            if (typeof id === 'string' && id !== '') {
+                const elem = document.createElement('a');
+                elem.className = 'anchor';
+                elem.href = '#' + id;
+                heading.prepend(elem);
+            } else if (heading.nodeName === 'H1' && heading.previousElementSibling == null) {
+                const elem = document.createElement('a');
+                elem.className = 'anchor';
+                elem.href = '#';
+                heading.prepend(elem);
+            }
+        }
+    </script>
+    {% endif %}
 </body>
 </html>
