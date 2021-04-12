@@ -444,7 +444,7 @@ Why is a linked list better than a `Vec` in this case? Because a variable should
 
 One way to achieve this with a `Vec` is to clone it whenever a new variable is added, but this is quite inefficient.
 
-An alternative is to add the variable to the `Vec` and remove it again when the variable's scope ends. The problem with this is that it requires passing a mutable `Vec` around, so the type system can't ensure that the `Vec` 's previous state is restored after a variable definition. A small error or even an early return could break it. This could be prevented with a https://aloso.github.io/2021/03/18/raii-guards.html[RAII guard], but the solution using `List` is more elegant.
+An alternative is to add the variable to the `Vec` and remove it again when the variable's scope ends. The problem with this is that it requires passing a mutable `Vec` around, so the type system can't ensure that the ``Vec``'s previous state is restored after a variable definition. A small error or even an early return could break it. This could be prevented with a https://aloso.github.io/2021/03/18/raii-guards.html[RAII guard], but the solution using `List` is more elegant.
 
 == Alternatives
 
