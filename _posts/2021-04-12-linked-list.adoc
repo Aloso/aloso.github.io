@@ -463,7 +463,7 @@ enum List<T> {
 
 This has all the advantages of our type, except that `Rc` and `Arc` incur a slight performance overhead when creating, cloning or dropping it.
 
-When you don't need the list to be persistent or immutable, you can just use a `Vec`. This also has some overhead due to heap allocations, but in return has better cache locality. More importantly, it's easier to use: Using a data structure that promises more performance but in turn makes your code more complex might not be a good idea; it's only worth it if it's in a performance-critical section of the code.
+When you don't need the list to be persistent or immutable, you can just use a `Vec` instead. This also has some overhead due to heap allocations, but in return has better cache locality. More importantly, it's easier to use: Keeping your code maintainable and easy to read is usually more important than to squeeze out every last drop of performance. Heavy optimization is only needed in performance-critical sections of the code.
 
 The often-cited quote "`Premature optimization is the root of all evil`" doesn't mean that you shouldn't optimize, rather that you should be clever about it. Do the most effective things to improve performance first: Choose efficient algorithms. Then benchmark your code, identify where it spends most of its time, try to optimize these parts, and verify that your optimizations actually yield an improvement. Trying to optimize code without measuring the results is a hopeless endeavor.
 
