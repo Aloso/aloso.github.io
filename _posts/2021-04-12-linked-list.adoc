@@ -1,0 +1,472 @@
+---
+layout: default
+title: A zero-overhead linked list in Rust
+show_meta: true
+date: 2021-04-12
+author: Ludwig Stecher
+tags: [Tutorial]
+---
+
+Let's implement an immutable, singly-linked list. _Singly-linked_ means that each node contains a reference to the next node, but not vice versa. To make this data structure really performant, let's use plain references instead of heap-allocated types. This would be dangerous in memory-unsafe languages like C, because it could easily cause vulnerabilities because of dangling pointers, but Rust's lifetimes protect us from this. We'll see what this means in a moment.
+
+== Implementation
+
+The implementation is fairly simple:
+
+[source, rust]
+----
+pub enum List<'a, T> {
+    Node {
+        data: T,
+        next: &'a List<'a, T>,
+    },
+    Tail
+}
+----
+
+So a list is either a node containing some data and a reference to the next node, or the _tail_, i.e. the end of the list. Let's write a `Default` implementation that creates an empty list, which is just `List::Tail`:
+
+[source, rust]
+----
+impl<T> Default for List<'_, T> {
+    fn default() -> Self {
+        List::Tail
+    }
+}
+----
+
+Now how do we add elements to the list? As I mentioned above, this list is _immutable_, so altering a list is not possible. Instead, let's introduce a concept from functional programming: Persistent data structures
+
+== Persistent data structures
+
+According to https://en.wikipedia.org/wiki/Persistent_data_structure[wikipedia]:
+
+> A persistent data structure is a data structure that always preserves the previous version of itself when it is modified. Such data structures are effectively immutable, as their operations do not (visibly) update the structure in-place, but instead always yield a new updated structure.
+
+We can achieve this by prepending a node at the front of the list: The previous list stays the same, but we get a new node pointing to it.
+
+[source, rust]
+----
+impl<'a, T> List<'a, T> {
+    pub fn add(&'a self, data: T) -> Self {
+        List::Node { data, next: self }
+    }
+}
+----
+
+Let's try it out:
+
+[source, rust]
+----
+#[test]
+fn test_add() {
+    let tail = List::Tail;
+    let first = tail.add(5);
+    let second = first.add(10);
+
+    assert_eq!(tail, List::Tail);
+    assert_eq!(first, List::Node {
+        data: 5,
+        next: &List::Tail,
+    });
+    assert_eq!(second, List::Node {
+        data: 10,
+        next: &List::Node {
+            data: 5,
+            next: &List::Tail,
+        },
+    });
+}
+----
+
+For this to work, we need to implement `Debug` and `PartialEq` for our type. While we're at it, let's also implement some other useful traits. Note that we can even implement `Copy`, since `next` is just a reference, not a `Box` or `Rc`:
+
+[source, rust]
+----
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum List<'a, T> {
+    // snip
+}
+----
+
+That's it! Now we can test it:
+
+[source, sh, subs="+macros,+quotes"]
+----
+> cargo test -q
+
+running 1 test
+pass:q[[green\]*.*]
+test result: pass:q[[green\]*ok*]. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+----
+
+== Writing an iterator
+
+In a functional language, we'd use this data structure mainly in recursive functions. It is, after all, a recursive data structure. But since this is Rust, let's implement an https://doc.rust-lang.org/std/iter/trait.Iterator.html[`Iterator`] for our type:
+
+[source, rust]
+----
+pub struct ListIter<'a, T>(&'a List<'a, T>);
+
+impl<'a, T> Iterator for ListIter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.0 {
+            List::Node { data, next } => {
+                self.0 = next;
+                Some(data)
+            }
+            List::Tail => None,
+        }
+    }
+}
+----
+
+[TIP]
+--
+This is a by-reference iterator. Writing an iterator that owns the element is not possible. This is a fundamental limitation of this list type, since the nodes are behind shared references.
+--
+
+We can also implement `IntoIterator` to make iterating over a `List` easier:
+
+[source, rust]
+----
+impl<'a, T> IntoIterator for &'a List<'a, T> {
+    type Item = &'a T;
+
+    type IntoIter = ListIter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ListIter(self)
+    }
+}
+----
+
+Let's test this as well:
+
+[source, rust]
+----
+#[test]
+fn test_iterator() {
+    let tail = List::Tail;
+    let first = tail.add(5);
+    let second = first.add(10);
+
+    let values: Vec<i32> =
+        second.into_iter().copied().collect();
+
+    assert_eq!(values, vec![10, 5]);
+}
+----
+
+But wait! Why are the values in the opposite order of how we added them? That's because the `add` function prepends nodes at the start of the list. We can think of it like a stack of books: We can put books on top of it, and we can take books from it, but only in the opposite order.
+
+Can't we just use `.rev()` to iterate in reverse direction? Let's try it:
+
+[.compile-error]
+[source, rust]
+----
+let values: Vec<i32> =
+    second.into_iter().rev().copied().collect();
+----
+[source, subs="+macros,+quotes"]
+----
+[red]*error[E0277]*: the trait bound `ListIter<'\_, {integer}>: DoubleEndedIterator` is not satisfied
+  --> src/lib.rs:78:28
+   |
+78 |     second.into_iter().rev().copied().collect();
+   |                        [red]#\^^^ the trait `DoubleEndedIterator` is not implemented for `ListIter<'_, {integer}>`#
+----
+
+So it doesn't work. To make it work, we'd have to implement the `DoubleEndedIterator` trait, but that can't be done very efficiently, because a list node can't access its previous node. Then let's try a different approach!
+
+== Internal iteration
+
+Iterating over the list in reverse order can be done efficiently, if we use a _recursive algorithm_. This doesn't work with the design of `Iterator` trait, so we'll just implement it as an _internal iterator_, i.e. a function that accepts a closure:
+
+[source, rust]
+----
+impl<'a, T> List<'a, T> {
+    // snip
+
+    pub fn rev_iter(&'a self, f: impl Fn(&'a T)) {
+        if let List::Node { data, next } = self {
+            next.rev_iter(&f); <1>
+            f(data); <2>
+        }
+    }
+}
+----
+<1> We call `rev_iter` recursively.
+<2> Because we want to iterate in reverse, we call the closure _after_ the recursive function call.
+
+This has the downside that we can't use iterator combinators like `filter` or `map`. It also doesn't allow error handling in the closure, but we can add one more internal iterator that stops iterating when the closure returns an error:
+
+[source, rust]
+----
+impl<'a, T> List<'a, T> {
+    // snip
+
+    pub fn try_rev_iter<E, F>(&'a self, f: F) -> Result<(), E>
+    where
+        F: Fn(&'a T) -> Result<(), E>,
+    {
+        if let List::Node { data, next } = self {
+            next.try_rev_iter(&f)?;
+            f(data)?;
+        }
+        Ok(())
+    }
+}
+----
+
+I'm omitting the test here, but you can read it in the https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=fbd969411281665b92a9884cd8d8bbbb[playground], or you can implement it as an exercise.
+
+== Limitations
+
+This type of list isn't useful very often. One reason for this is that it can only be iterated over by-reference. The other reason I'll demonstrate now. Let's try to create a function that constructs a `List` and returns it:
+
+[.compile-error]
+[source, rust]
+----
+fn too_bad<'a>() -> List<'a, i32> {
+    let tail = List::Tail;
+    let v1 = tail.add(1);
+    let v2 = v1.add(2);
+    v2
+}
+----
+
+[source, subs="+macros,+quotes"]
+----
+[red]*error[E0515]*: cannot return value referencing local variable `tail`
+   --> src/lib.rs:107:5
+    |
+105 |     let v1 = tail.add(1);
+    |              [blue]#---- `tail` is borrowed here#
+106 |     let v2 = v1.add(2);
+107 |     v2
+    |     [red]#^^ returns a value referencing data owned by the current function#
+
+[red]*error[E0515]*: cannot return value referencing local variable `v1`
+   --> src/lib.rs:107:5
+    |
+106 |     let v2 = v1.add(2);
+    |              [blue]#-- `v1` is borrowed here#
+107 |     v2
+    |     [red]#^^ returns a value referencing data owned by the current function#
+----
+
+So this doesn't work. We can't return a list if it was created in the current function. How about a function that adds elements to a list in-place?
+
+[.compile-error]
+[source, rust]
+----
+fn doesnt_work<'a>(list: &'a mut List<'a, i32>) {
+    let old_list = std::mem::take(list);
+    *list = old_list.add(5);
+}
+----
+
+[source, subs="+macros,+quotes"]
+----
+[red]*error[E0597]*: `old_list` does not live long enough
+   --> src/lib.rs:112:13
+    |
+110 | fn doesnt_work<'a>(list: &'a mut List<'a, i32>) {
+    |                [blue]#-- lifetime `'a` defined here#
+111 |     let old_list = std::mem::take(list);
+112 |     *list = old_list.add(5);
+    |             [red]##\^^^\^^^^^##[blue]#-------#
+    |             [blue]#|#
+    |             [red]#borrowed value does not live long enough#
+    |             [blue]#argument requires that `old_list` is borrowed for `'a`#
+113 | }
+    | [blue]#- `old_list` dropped here while still borrowed#
+----
+
+That doesn't work either. This probably doesn't come as a surprise if you're familiar with Rust's ownership rules: When we return a list, it can't borrow anything defined in the current function. If Rust didn't prevent this, we could accidentally get a _dangling reference_.
+
+[TIP]
+.What's a dangling reference?
+--
+All local variables live on the _stack_. Let's use the analogy of a pile of books again: When a function is called, a new book is placed on the stack, and when the function exits, the book is removed. A dangling reference is a reference into a book that has already been removed from the stack. However, if a different book is then put in its place, its memory is overwritten, so the reference becomes invalid. Luckily for us, Rust's borrow checker prevents references from becoming dangling.
+--
+
+== Use case
+
+So when is this type useful? When you need to efficiently add nodes to a list without modifying the original list, and the limitations above are not a problem.
+
+One example that comes to mind is an interpreter for a stack-based programming language. Here's a simple example:
+
+[source, rust]
+----
+#[derive(Clone, PartialEq)]
+pub enum Value {
+    Num(f64),
+    Bool(bool),
+    String(String),
+}
+
+pub enum Expr {
+    Value(Value),
+    Variable(String),
+    UnExpr(UnExprKind, Box<Expr>),
+    BinExpr(BinExprKind, Box<(Expr, Expr)>),
+    Define(String, Box<(Expr, Expr)>),
+    IfThenElse(Box<(Expr, Expr, Expr)>),
+}
+
+pub enum UnExprKind {
+    Not,
+    Neg,
+}
+
+#[derive(PartialEq)]
+pub enum BinExprKind {
+    // Arithmetic
+    Add,
+    Sub,
+    Mul,
+    Div,
+
+    // Logic
+    And,
+    Or,
+    Equals,
+    NotEquals,
+}
+----
+
+This programming language has three data types, numbers, booleans and strings. Numbers support basic arithmetic operations (`+`, `-`, `*`, `/`), booleans support logic operations (`&&`, `||`, `!`, `==`, `!=`). Operations are divided into _unary_ operations (those with only one operand) and _binary_ operations (those with two operands).
+
+The programming language is expression-based, so everything is an expresssion. An expression can be a value, a variable, a unary or binary operation, a variable definition, or a condition. Note that a variable definition always introduces a new scope in which the defined variable can be used. The syntax could look something like this:
+
+[source, subs="+macros,+quotes"]
+----
+[k]#define# x = [mi]#5# [k]#in#
+    some_expression
+----
+
+This defines a variable `x`, which can be used in `some_expression`. The only way to define multiple variables is to nest them:
+
+[source, subs="+macros,+quotes"]
+----
+[k]#define# x = [mi]#5# [k]#in#
+    [k]#define# y = [mi]#42# [k]#in#
+        x [nf]#+# y
+----
+
+Now let's implement the function that evaluates this language:
+
+[source, rust]
+----
+type Variables<'a> = List<'a, (String, Value)>;
+
+pub fn eval(
+    vars: &Variables<'_>,
+    expr: Expr,
+) -> Option<Value> {
+    match expr {
+        Expr::Value(val) => Some(val),
+
+        Expr::Variable(var) => vars  <1>
+            .into_iter()
+            .find(|&(v, _)| *v == var)
+            .map(|(_, val)| val.clone()),
+
+        Expr::UnExpr(kind, expr) => {
+            eval_unary(kind, vars, *expr)
+        }
+
+        Expr::BinExpr(kind, exprs) => {
+            eval_binary(kind, vars, exprs.0, exprs.1)
+        }
+
+        Expr::Define(name, exprs) => {
+            let value = eval(vars, exprs.0)?;
+            let vars = vars.add((name, value));  <2>
+            eval(&vars, exprs.1)
+        }
+
+        Expr::IfThenElse(exprs) => {
+            if let Value::Bool(b) = eval(vars, exprs.0)? {
+                eval(vars, if b { exprs.1 } else { exprs.2 })
+            } else {
+                None
+            }
+        }
+    }
+}
+
+fn eval_unary(
+    kind: UnExprKind,
+    vars: &Variables<'_>,
+    expr: Expr,
+) -> Option<Value> {
+    match (kind, eval(vars, expr)?) {
+        (UnExprKind::Not, Value::Bool(b)) => {
+            Some(Value::Bool(!b))
+        }
+        (UnExprKind::Neg, Value::Num(n)) => {
+            Some(Value::Num(-n))
+        }
+        _ => None,
+    }
+}
+
+fn eval_binary(
+    kind: BinExprKind,
+    vars: &Variables<'_>,
+    lhs: Expr,
+    rhs: Expr,
+) -> Option<Value> {
+    match kind {
+        BinExprKind::Add => {
+            if let Value::Num(lhs) = eval(vars, lhs)? {
+                if let Value::Num(rhs) = eval(vars, rhs)? {
+                    return Some(Value::Num(lhs + rhs));
+                }
+            }
+            None
+        }
+        // remaining match arms omitted
+    }
+}
+----
+<1> Look up the variable with the name `var`.
+<2> Add a new variable to the list
+
+The full code, including tests, is in the https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=fbd969411281665b92a9884cd8d8bbbb[playground].
+
+Why is a linked list better than a `Vec` in this case? Because a variable should only be visible in its own scope, so when evaluating a variable definition, the list of variables should be the same afterwards as before.
+
+One way to achieve this with a `Vec` is to clone it whenever a new variable is added, but this is quite inefficient.
+
+An alternative is to add the variable to the `Vec` and remove it again when the variable's scope ends. The problem with this is that it requires passing a mutable `Vec` around, so the type system can't ensure that the `Vec` 's previous state is restored after a variable definition. A small error or even an early return could break it. This could be prevented with a https://aloso.github.io/2021/03/18/raii-guards.html[RAII guard], but the solution using `List` is more elegant.
+
+== Alternatives
+
+To get around the lifetime issues, you can use reference-counted smart pointers (https://doc.rust-lang.org/std/rc/struct.Rc.html[`Rc`] or https://doc.rust-lang.org/std/sync/struct.Arc.html[`Arc`]):
+
+[source, rust]
+----
+enum List<T> {
+    Node {
+        data: T,
+        next: Arc<List<T>>,
+    },
+    Tail,
+}
+----
+
+This has all the advantages of our type, except that `Rc` and `Arc` incur a slight performance overhead when creating, cloning or dropping it.
+
+When you don't need the list to be persistent or immutable, you can just use a `Vec`. This also has some overhead due to heap allocations, but in return has better cache locality. More importantly, it's easier to use: Using a data structure that promises more performance but in turn makes your code more complex might not be a good idea; it's only worth it if it's in a performance-critical section of the code.
+
+The often-cited quote "`Premature optimization is the root of all evil`" doesn't mean that you shouldn't optimize, rather that you should be clever about it. Do the most effective things to improve performance first: Choose efficient algorithms. Then benchmark your code, identify where it spends most of its time, try to optimize these parts, and verify that your optimizations actually yield an improvement. Trying to optimize code without measuring the results is a hopeless endeavor.
+
+== Fin
+
+I'm looking forward to the discussion on Reddit. You can also open an issue in the https://github.com/Aloso/aloso.github.io/issues[issue tracker]. Until next time!

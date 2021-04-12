@@ -5,6 +5,7 @@ show_meta: true
 date: 2021-03-18
 author: Ludwig Stecher
 excerpt_separator: // END OF EXCERPT
+tags: [Tutorial]
 ---
 
 As you probably know, Rust doesn't have automatic garbage collection. Instead, it relies on destructors to clean up memory, and these destructor calls are automatically inserted in the appropriate places at compile time. And since Rust uses traits for everything, destructors use a trait as well: The https://doc.rust-lang.org/std/ops/trait.Drop.html[`Drop`] trait.

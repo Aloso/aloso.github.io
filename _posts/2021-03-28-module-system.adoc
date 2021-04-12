@@ -4,6 +4,7 @@ title: Rusts Module System Explained
 show_meta: true
 date: 2021-03-28
 author: Ludwig Stecher
+tags: [Tutorial]
 ---
 
 The Rust programming language can be confusing for beginners, and the module system is one part that causes frustration particularly often. There are quite a few blog posts out there trying to explain the module system in a simple way, but I often have the feeling that they over-simplify things. So here's my take--a more detailed explanation of the module system.

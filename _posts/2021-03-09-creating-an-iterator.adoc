@@ -5,6 +5,7 @@ show_meta: true
 date: 2021-03-09
 author: Ludwig Stecher
 excerpt_separator: // END OF EXCERPT
+tags: [Tutorial]
 ---
 
 When I woke up today, I thought, what a great day to start a blog! So here we are. Before we take off, just a short introduction: I'm Ludwig, I'm a CS student from Germany, and I love Rust. Since this blog is about Rust, I hope you do too!

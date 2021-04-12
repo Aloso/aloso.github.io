@@ -7,6 +7,8 @@ $monospace: 'JetBrains Mono', 'Roboto Mono', 'Hack', 'Consolas', 'Noto Mono', mo
 
 // colors
 $main-bg: #171717;
+$bg-light: #343434;
+$bg-line: #777777;
 $link-color: #73deff;
 $scrollbar: #555 #292929;
 $scrollbar-focused: #666 #292929;
@@ -100,6 +102,22 @@ em:not(.no-yellow) {
 #nav a.active {
     text-decoration: underline 2px;
     text-underline-offset: 0.45rem;
+}
+
+.tag {
+    font-size: 0.93rem;
+    letter-spacing: 0.012em;
+    color: white;
+    background: black;
+    border-radius: 100px;
+    padding: 0.1em 0.6em;
+    margin-right: 0.6em;
+    border: 1px solid $bg-line;
+    box-shadow: 0 0 5px #353535;
+
+    & + .tag {
+        margin-left: -0.6em;
+    }
 }
 
 #footer {

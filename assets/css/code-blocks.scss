@@ -17,6 +17,12 @@ pre {
     .green {
         color: #4dec4d;
     }
+    .red {
+        color: #ff6161;
+    }
+    .blue {
+        color: #34d6ff;
+    }
     .diffadd {
         background-color: #053a05;
         display: block;
@@ -28,6 +34,22 @@ pre {
         &::before {
             content: "+";
             color: #4dec4d;
+        }
+    }
+}
+
+.compile-error {
+    pre {
+        margin-bottom: 2px;
+        box-shadow: inset 1.5rem 0 0 -1.2rem red;
+    }
+
+    & + * pre {
+        margin-top: 2px;
+        font-size: 85%;
+
+        code {
+            font-size: 100%;
         }
     }
 }

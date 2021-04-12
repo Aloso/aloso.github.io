@@ -4,6 +4,7 @@ title: Rust's Universes
 show_meta: true
 date: 2021-03-10
 author: Ludwig Stecher
+tags: [Rust in depth]
 ---
 
 This post describes a curious feature of Rust: Namespaces, also called universes. Note that Rust's namespaces are nothing like namespaces in languages such as TypeScript or C♯; they are also unrelated to all of space and time, although there are certainly parallels.
