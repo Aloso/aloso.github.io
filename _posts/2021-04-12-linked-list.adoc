@@ -469,4 +469,4 @@ The often-cited quote "`Premature optimization is the root of all evil`" doesn't
 
 == Fin
 
-I'm looking forward to the discussion on Reddit. You can also open an issue in the https://github.com/Aloso/aloso.github.io/issues[issue tracker]. Until next time!
+I'm looking forward to the discussion on https://www.reddit.com/r/rust/comments/mpncp6/a_zerooverhead_linked_list_in_rust/[Reddit]. You can also open an issue in the https://github.com/Aloso/aloso.github.io/issues[issue tracker]. Until next time!
