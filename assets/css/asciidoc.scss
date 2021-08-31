@@ -50,14 +50,19 @@ span.icon > .fa {
     }
 }
 
-li > p {
+li > p,
+li > .paragraph > p {
     margin: 0.667rem 0;
 }
 
-.compact li > p {
+.compact li > p,
+.compact li > .paragraph > p {
     margin: 0;
 }
 
+.olist > ol > li::marker {
+    font-size: 1.15rem;
+}
 
 .listingblock {
     > .title {
