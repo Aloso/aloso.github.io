@@ -35,7 +35,7 @@ mod normal;
 
 These are functionally equivalent. If the content of an inline module is very long, move it to another file, to keep the code neat and manageable.
 
-When the module is not inline, Rust looks for the content of the module in another file, either `[.no-yellow]_module_name_.rs` or `[.no-yellow]_module_name_/mod.rs`. It might seem odd that we have to declare modules explicitly (unlike in Python, where modules are inferred from the file system). However, there's a good reason for this, as we'll see later.
+When the module is not inline, Rust looks for the content of the module in another file, either `[.no-yellow]_module_name_.rs` or `[.no-yellow]_module_name_/mod.rs`. It might seem odd that we have to declare modules explicitly (unlike in Python, where modules are inferred from the file system). However, there are good reasons for this, as we'll see later.
 
 Like every tree, the module tree has a _root_. This is the file `lib.rs` in case of a library crate, or the file `main.rs` in case of a binary crate footnote:[A crate can also have multiple targets (library, binary, example, test, and benchmark targets), in which case each target has its own root. You can read more about this https://doc.rust-lang.org/cargo/reference/cargo-targets.html[here].].
 
@@ -386,6 +386,16 @@ Declarative macros (the ones that are declared with `macro_rules!`) behave more 
 And, they can't be declared public. The `#[macro_export]` attribute can be added to a macro, which exports it publicly at the crate root. This can be undesirable, however, if it's not supposed to be part of the public API; there is no equivalent of `pub(crate)` for macros.
 
 One workaround for this is to put our macros in a module and annotate the module with `#[macro_use]`. The module should be the _first module declaration_ in the crate root. This ensures that the macros can be used everywhere in our crate, but not outside of the crate. Not the most elegant solution, but it works.
+
+== Why are modules declared explicitly?
+
+I promised to explain why modules have to be declared explicitly. There are a few reasons:
+
+1. With the https://doc.rust-lang.org/reference/items/modules.html#the-path-attribute[`#[path\]`] attribute, a module can be located in a different directory, or have a different name than the file.
+2. Module declarations can have a visibility, e.g. `pub(crate) mod foo;`
+3. Sometimes there are files which you don't want to include in the module tree.
++
+For example, a crate with both a library and a binary target usually contains a `lib.rs` file for the library and a `main.rs` file for the binary. Submodules are stored in the same directory, but some modules are only needed by the library, and some only by the binary. By specifying the modules explicitly, you can include only the necessary modules in each file.
 
 == Fin
 
