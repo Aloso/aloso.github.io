@@ -1,0 +1,55 @@
+---
+layout: default
+title: We don't need revenge
+show_meta: true
+date: 2023-05-30
+author: Ludwig Stecher
+tags: [Tutorial]
+---
+
+> https://en.wikipedia.org/wiki/Mob_rule[Mob justice] is when a person suspected to be a criminal is beaten by a group of people or crowd with clubs, stones, machetes, or anything they can lay their hands on
+> -- https://en.wikipedia.org/wiki/Mob_justice_in_Ghana[Wikipedia]
+
+Is this what the Rust community wants?
+
+If you don't know what I mean, I'm talking about https://www.reddit.com/r/rust/comments/13uidp3/accountability_requires_courage/[this Reddit thread], which asks for courage and accountability from the Rust project leadership. That sounds reasonable, who doesn't want the leaders to be accountable? The problem is in how they want to achieve it: By asking Rust project members to "name and shame" the people who messed up. But what happens then?
+
+== Background
+
+It started with https://thephd.dev/i-am-no-longer-speaking-at-rustconf-2023[this blog post], where ThePHD explained why they are no longer speaking at RustConf 2023. Some people from the Rust project had reservations about ThePHD's work, but it's unclear who exactly. Since then, a shitstorm has unfolded as more and more alarming details have come to light. Someone in the Rust leadership even https://www.jntrnr.com/why-i-left-rust/[resigned in protest], and a well-known Rust educator also https://gist.github.com/fasterthanlime/42da9378768aebef662dd26dddf04849[ended his involvement]. Now, the Rust project leadership has https://blog.rust-lang.org/2023/05/29/RustConf.html[apologized] and said that the people responsible have resigned from their positions. Of course, people want to know who in the Rust project was responsible.
+
+== Accountability, whatever that means
+
+The Rust community has always been perceived as happy and welcoming, and we are proud of that. We have made it possible for anyone, regardless of background, to learn the language, contribute, and propose new features. Changes must follow the RFC process, which is based on https://en.wikipedia.org/wiki/Consensus_decision-making[consensus], and communication happens in the open... mostly. Some decisions are time critical or involve personal/confidential information, so we don't know everything the Rust leadership does.
+
+What does accountability mean? According to https://en.wikipedia.org/wiki/Accountability[Wikipedia], it means _"A is accountable to B when A is obliged to inform B about A's (past or future) actions and decisions, to justify them, and to suffer punishment in the case of eventual misconduct" and more._
+
+Accountability is important to ensure that people act responsibly. But to whom should Rust's leadership be accountable? There are three options:
+
+1. They are accountable to each other
+2. They are accountable to another person or group, like a control gremium
+3. They are accountable to the wider Rust community
+
+The last option doesn't really make sense though: When an event or decision affects the public, the public should be informed in the interest of transparency. But when someone does something wrong, the public is not in a position to punish the person appropriately, or to fix the problem.
+
+== The ethics of punishment
+
+Every government has a justice system for punishing criminals, even though we don't know exactly what “justice” means. People seem to have an innate sense of justice, but it is coupled with our emotions. To justify punishment, it must be **useful**, and of course there are quite a few reasons why punishment is useful:
+
+- It prevents the criminal from doing it again
+- It discourages others from doing anything illegal
+- The criminal gets to repent and feel less guilty after accepting the punishment
+- The victim may feel vindicated by getting “revenge”
+
+But before punishing someone, we must first understand why the criminal did it. Most people (including criminals) are not evil psychopaths, and understanding their perspective is important to figure out what to do with them. Therefore, a criminal has the right to a fair trial in any https://en.wikipedia.org/wiki/Rechtsstaat[Rechtsstaat] (legal system).
+
+Now, the Rust project is not a government, but it can still punish someone by banning them or removing them from their leadership position. Of course that person should be given a chance to justify their actions. When someone behaves badly, it's usually an accident, often caused by bad communication.
+
+== Why do we need to know whose fault it was?
+
+We don't, because it wouldn't help anyone. I would support it if the people who treated ThePHD harshly apologized _on their own terms_. But outing them without their permission is not acceptable: It puts them at risk of https://en.wikipedia.org/wiki/Online_shaming[online shaming], which goes against everything that Rust stands for. And even though online shaming can be seen as a punishment for their actions, there are two problems:
+
+1. Without a trial, we don't know what punishment they deserve.
+2. A punishment should never violate someone's dignity, no matter how serious the crime.
+
+As long as we don't have all the information, all we can do is speculate (which doesn't mean that we should). Unsurprisingly, the people within the project, who _do_ have all the information, already https://blog.rust-lang.org/2023/05/29/RustConf.html[took steps] to resolve the conflict and punish those who messed up. The Rust project isn't perfect, no organization consisting of humans is. But I do think they are trying their best.
