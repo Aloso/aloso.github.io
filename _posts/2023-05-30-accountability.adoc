@@ -4,7 +4,7 @@ title: We don't need revenge
 show_meta: true
 date: 2023-05-30
 author: Ludwig Stecher
-tags: [Tutorial]
+tags: [Politics]
 ---
 
 > https://en.wikipedia.org/wiki/Mob_rule[Mob justice] is when a person suspected to be a criminal is beaten by a group of people or crowd with clubs, stones, machetes, or anything they can lay their hands on
