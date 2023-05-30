@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Nunito+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+        rel="stylesheet">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/layout.css?t=1685419102">
+    <title>Aloso's Blog</title>
+
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/fav/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/fav/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/fav/favicon-16x16.png">
+    <link rel="manifest" href="/assets/fav/site.webmanifest?t=1685419102">
+    <link rel="mask-icon" href="/assets/fav/safari-pinned-tab.svg" color="#f88e00">
+    <link rel="shortcut icon" href="/assets/fav/favicon.ico">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-config" content="/assets/fav/browserconfig.xml?t=1685419102">
+    <meta name="theme-color" content="#ffffff">
+</head>
+
+<body>
+    <div id="nav">
+    <div id="nav-inner">
+        
+            
+
+            
+                <a id="home" class="active" href="/">Aloso's blog</a>
+            
+        
+            
+
+            
+                <a href="/about">About</a>
+            
+        
+    </div>
+</div>
+
+    <div id="main">
+        <div id="main-inner">
+            <h1>Aloso's Blog</h1>
+            
+
+            
+
+            
+<div class="post-preview">
+    <h2 class="post-title-link">
+        <a href="/2023/05/30/accountability.html">We don't need revenge</a>
+    </h2>
+    <div class="mini-meta">
+        
+        <span class="tag">Politics</span>
+        
+
+        30 May 2023 <span class="bullet"></span> 5 minutes read
+    </div>
+    <div class="quoteblock">
+<blockquote>
+<div class="paragraph">
+<p><a href="https://en.wikipedia.org/wiki/Mob_rule">Mob justice</a> is when a person suspected to be a criminal is beaten by a group of people or crowd with clubs, stones, machetes, or anything they can lay their hands on</p>
+</div>
+</blockquote>
+<div class="attribution">
+&#8212; <a href="https://en.wikipedia.org/wiki/Mob_justice_in_Ghana">Wikipedia</a>
+</div>
+</div>
+    <a class="continue-reading" href="/2023/05/30/accountability.html">Continue reading...</a>
+</div>
+
+<div class="post-preview">
+    <h2 class="post-title-link">
+        <a href="/2021/04/12/linked-list.html">A zero-overhead linked list in Rust</a>
+    </h2>
+    <div class="mini-meta">
+        
+        <span class="tag">Tutorial</span>
+        
+
+        12 Apr 2021 <span class="bullet"></span> 21 minutes read
+    </div>
+    <div class="paragraph">
+<p>Let&#8217;s implement an immutable, singly-linked list. <em>Singly-linked</em> means that each node contains a reference to the next node, but not vice versa. To make this data structure really performant, let&#8217;s use plain references instead of heap-allocated types. This would be dangerous in memory-unsafe languages like C, because it could easily cause vulnerabilities because of dangling pointers, but Rust&#8217;s lifetimes protect us from this. We&#8217;ll see what this means in a moment.</p>
+</div>
+    <a class="continue-reading" href="/2021/04/12/linked-list.html">Continue reading...</a>
+</div>
+
+<div class="post-preview">
+    <h2 class="post-title-link">
+        <a href="/2021/03/28/module-system.html">Rusts Module System Explained</a>
+    </h2>
+    <div class="mini-meta">
+        
+        <span class="tag">Tutorial</span>
+        
+
+        28 Mar 2021 <span class="bullet"></span> 18 minutes read
+    </div>
+    <div class="paragraph">
+<p>The Rust programming language can be confusing for beginners, and the module system is one part that causes frustration particularly often. There are quite a few blog posts out there trying to explain the module system in a simple way, but I often have the feeling that they over-simplify things. So here&#8217;s my take&#8212;&#8203;a more detailed explanation of the module system.</p>
+</div>
+    <a class="continue-reading" href="/2021/03/28/module-system.html">Continue reading...</a>
+</div>
+
+<div class="post-preview">
+    <h2 class="post-title-link">
+        <a href="/2021/03/18/raii-guards.html">Implementing RAII guards in Rust</a>
+    </h2>
+    <div class="mini-meta">
+        
+        <span class="tag">Tutorial</span>
+        
+
+        18 Mar 2021 <span class="bullet"></span> 12 minutes read
+    </div>
+    <div class="paragraph">
+<p>As you probably know, Rust doesn&#8217;t have automatic garbage collection. Instead, it relies on destructors to clean up memory, and these destructor calls are automatically inserted in the appropriate places at compile time. And since Rust uses traits for everything, destructors use a trait as well: The <a href="https://doc.rust-lang.org/std/ops/trait.Drop.html"><code>Drop</code></a> trait.</p>
+</div>
+<div class="paragraph">
+<p>This has the benefit that <code>Drop</code> can be implemented to do anything, not just cleaning up memory: It can also release a file descriptor, close a network socket, cancel an in-flight HTTP request, and much more. Whenever you acquire some sort of resource, and want to release it when you&#8217;re done with it, the <code>Drop</code> trait is your friend.</p>
+</div>
+    <a class="continue-reading" href="/2021/03/18/raii-guards.html">Continue reading...</a>
+</div>
+
+<div class="post-preview">
+    <h2 class="post-title-link">
+        <a href="/2021/03/10/rusts-universes.html">Rust's Universes</a>
+    </h2>
+    <div class="mini-meta">
+        
+        <span class="tag">Rust in depth</span>
+        
+
+        10 Mar 2021 <span class="bullet"></span> 9 minutes read
+    </div>
+    <div class="paragraph">
+<p>This post describes a curious feature of Rust: Namespaces, also called universes. Note that Rust&#8217;s namespaces are nothing like namespaces in languages such as TypeScript or C♯; they are also unrelated to all of space and time, although there are certainly parallels.</p>
+</div>
+    <a class="continue-reading" href="/2021/03/10/rusts-universes.html">Continue reading...</a>
+</div>
+
+<div class="post-preview">
+    <h2 class="post-title-link">
+        <a href="/2021/03/09/creating-an-iterator.html">Creating an Iterator in Rust</a>
+    </h2>
+    <div class="mini-meta">
+        
+        <span class="tag">Tutorial</span>
+        
+
+        09 Mar 2021 <span class="bullet"></span> 19 minutes read
+    </div>
+    <div class="paragraph">
+<p>When I woke up today, I thought, what a great day to start a blog! So here we are. Before we take off, just a short introduction: I&#8217;m Ludwig, I&#8217;m a CS student from Germany, and I love Rust. Since this blog is about Rust, I hope you do too!</p>
+</div>
+<div class="paragraph">
+<p>This post is about a core concept in Rust, iterators. If you don&#8217;t know what iterators are, please read <a href="https://doc.rust-lang.org/book/ch13-02-iterators.html">the chapter about iterators</a> in the Rust book first.</p>
+</div>
+    <a class="continue-reading" href="/2021/03/09/creating-an-iterator.html">Continue reading...</a>
+</div>
+
+
+        </div>
+    </div>
+    <div id="footer">
+    <div id="footer-inner">
+        &copy; Ludwig Stecher
+        <span class="bullet"></span>
+        <a href="https://github.com/Aloso">GitHub</a>
+        <span class="bullet"></span>
+        <a href="https://github.com/Aloso/aloso.github.io/">Found a typo?</a>
+        <span class="bullet"></span>
+        <a href="/feed.xml">Atom feed</a>
+
+        <div id="license">
+            This work is licensed under a <a href="https://creativecommons.org/licenses/by/4.0/">Creative Commons
+                Attribution 4.0 International</a> License.
+        </div>
+    </div>
+</div>
+<script>
+    console.log('Font Awesome Free 5.15.3 by @fontawesome - https://fontawesome.com\nLicense - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License)\n');
+</script>
+
+
+    
+</body>
+</html>

@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Nunito+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+        rel="stylesheet">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/layout.css?t=1685419102">
+    <title>Rusts Module System Explained</title>
+
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/fav/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/fav/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/fav/favicon-16x16.png">
+    <link rel="manifest" href="/assets/fav/site.webmanifest?t=1685419102">
+    <link rel="mask-icon" href="/assets/fav/safari-pinned-tab.svg" color="#f88e00">
+    <link rel="shortcut icon" href="/assets/fav/favicon.ico">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-config" content="/assets/fav/browserconfig.xml?t=1685419102">
+    <meta name="theme-color" content="#ffffff">
+</head>
+
+<body>
+    <div id="nav">
+    <div id="nav-inner">
+        
+            
+
+            
+                <a id="home" href="/">Aloso's blog</a>
+            
+        
+            
+
+            
+                <a href="/about">About</a>
+            
+        
+    </div>
+</div>
+
+    <div id="main">
+        <div id="main-inner">
+            <h1>Rusts Module System Explained</h1>
+            
+            <div id="meta">
+                
+                    <span class="tag">Tutorial</span>
+                
+                28 Mar 2021
+                <span class="bullet"></span>
+                18 minutes read
+            </div>
+            
+
+            
+            <div id="toc">
+                <div id="toc-title">Table of Contents</div>
+                <ul class="sectlevel1">
+<li><a href="#why-do-modules-exist">Why do modules exist?</a></li>
+<li><a href="#the-module-tree">The module tree</a>
+<ul class="sectlevel2">
+<li><a href="#submodules">Submodules</a></li>
+<li><a href="#an-example">An example</a></li>
+</ul>
+</li>
+<li><a href="#items-and-paths">Items and paths</a></li>
+<li><a href="#visibility">Visibility</a>
+<ul class="sectlevel2">
+<li><a href="#encapsulation">Encapsulation</a></li>
+<li><a href="#fine-grained-visibility">Fine-grained visibility</a></li>
+<li><a href="#visibilities-overview">Visibilities overview</a></li>
+</ul>
+</li>
+<li><a href="#exports">Exports</a></li>
+<li><a href="#common-pitfalls">Common pitfalls</a></li>
+<li><a href="#special-cases">Special cases</a>
+<ul class="sectlevel2">
+<li><a href="#enum-variants-and-fields">Enum variants and fields</a></li>
+<li><a href="#macros">Macros</a></li>
+</ul>
+</li>
+<li><a href="#why-are-modules-declared-explicitly">Why are modules declared explicitly?</a></li>
+<li><a href="#fin">Fin</a></li>
+</ul>
+            </div>
+            
+
+            <div class="paragraph">
+<p>The Rust programming language can be confusing for beginners, and the module system is one part that causes frustration particularly often. There are quite a few blog posts out there trying to explain the module system in a simple way, but I often have the feeling that they over-simplify things. So here&#8217;s my take&#8212;&#8203;a more detailed explanation of the module system.</p>
+</div>
+<div class="paragraph">
+<p>This post assumes that you can write at least a &#8220;hello world&#8221; Rust program. It&#8217;s a rather long read, so get comfortable, maybe with a cup of tea, hot chocolate, or whatever your heart desires 😊</p>
+</div>
+<div class="sect1">
+<h2 id="why-do-modules-exist">Why do modules exist?</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Modules give your code <em>structure</em>: Dividing your code into modules is like dividing your house into several rooms: Each room has a different purpose, and rooms can be locked for privacy.</p>
+</div>
+<div class="imageblock medium">
+<div class="content">
+<img src="/assets/images/2021-03-28-floor-plan.png" alt="Floor plan">
+</div>
+<div class="title">Figure 1. Floor plan. <a href="https://commons.wikimedia.org/wiki/File:Schmidt-Lademann_house_floor_plan.png">Source</a> (modified; <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.en">license</a>)</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="the-module-tree">The module tree</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Modules are structured in a <em>hierarchy</em>, the module tree, which is similar to the file tree of the source files. There are two kinds of modules: Inline modules and “normal” modules:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">mod</span> <span class="n">inline</span> <span class="p">{</span>
+    <span class="c1">// content of the module</span>
+<span class="p">}</span>
+
+<span class="k">mod</span> <span class="n">normal</span><span class="p">;</span>
+<span class="c1">// the content is in another file</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>These are functionally equivalent. If the content of an inline module is very long, move it to another file, to keep the code neat and manageable.</p>
+</div>
+<div class="paragraph">
+<p>When the module is not inline, Rust looks for the content of the module in another file, either <code><em class="no-yellow">module_name</em>.rs</code> or <code><em class="no-yellow">module_name</em>/mod.rs</code>. It might seem odd that we have to declare modules explicitly (unlike in Python, where modules are inferred from the file system). However, there are good reasons for this, as we&#8217;ll see later.</p>
+</div>
+<div class="paragraph">
+<p>Like every tree, the module tree has a <em>root</em>. This is the file <code>lib.rs</code> in case of a library crate, or the file <code>main.rs</code> in case of a binary crate <sup class="footnote">[<a id="_footnoteref_1" class="footnote" href="#_footnotedef_1" title="View footnote.">1</a>]</sup>.</p>
+</div>
+<div class="sect2">
+<h3 id="submodules">Submodules</h3>
+<div class="paragraph">
+<p>Unfortunately, Rust is not the most consistent language when it comes to modules: There are two different ways to structure a module tree, and they can be mixed within the same crate.</p>
+</div>
+<div class="paragraph">
+<p>Say we have a library crate with a module <code>parent</code>, which contains a sub-module <code>child</code>:</p>
+</div>
+<div class="listingblock file-tree">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="source">└─ <strong class="folder">library root</strong>
+   └─ <strong class="file">parent</strong>
+      └─ <strong class="file">child</strong></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The crate root is in a <code>lib.rs</code> file in the <code>src</code> directory. However, the <code>parent</code> module can be either in a <code>parent.rs</code> file next to <code>lib.rs</code>, or in a <code>mod.rs</code> file in a <code>parent</code> directory:</p>
+</div>
+<div class="openblock flex">
+<div class="content">
+<div class="listingblock file-tree">
+<div class="title">File tree A</div>
+<div class="content">
+<pre class="rouge highlight"><code data-lang="source">├─ <strong class="file">Cargo.toml</strong>
+└─ <strong class="folder">src/</strong>
+   ├─ <strong class="file">lib.rs</strong>
+   ├─ <strong class="file">parent.rs</strong>  // parent module
+   └─ <strong class="folder">parent/</strong>
+      └─ <strong class="file">child.rs</strong></code></pre>
+</div>
+</div>
+<div class="listingblock file-tree">
+<div class="title">File tree B</div>
+<div class="content">
+<pre class="rouge highlight"><code data-lang="source">├─ <strong class="file">Cargo.toml</strong>
+└─ <strong class="folder">src/</strong>
+   ├─ <strong class="file">lib.rs</strong>
+   └─ <strong class="folder">parent/</strong>
+      ├─ <strong class="file">mod.rs</strong>  // parent module
+      └─ <strong class="file">child.rs</strong></code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>It doesn&#8217;t really matter which way you go, just do what you prefer. I use the first way (&#8220;File tree A&#8221;), since it&#8217;s easier to add sub-modules. For example, if you want to add a submodule to <code>child</code>, you just need to create a folder and a new file, and add a <code>mod</code> declaration:</p>
+</div>
+<div class="listingblock file-tree">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="source"> ├─ <strong class="file">Cargo.toml</strong>
+ └─ <strong class="folder">src/</strong>
+    ├─ <strong class="file">lib.rs</strong>
+    ├─ <strong class="file">parent.rs</strong>
+    └─ <strong class="folder">parent/</strong>
+       ├─ <strong class="file">child.rs</strong>
+<span class="diffadd">      └─ <strong class="folder">child/</strong></span>
+<span class="diffadd">          └─ <strong class="file">grand_child.rs</strong></span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The path of a module can also be specified explicitly with the <a href="https://doc.rust-lang.org/reference/items/modules.html#the-path-attribute"><code>#[path]</code></a> attribute, but this is rarely used in practice.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="an-example">An example</h3>
+<div class="paragraph">
+<p>Hopefully this will make more sense once you see an example. Here&#8217;s the module structure of a library crate:</p>
+</div>
+<div class="listingblock file-tree">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="source">├─ <strong class="file">Cargo.toml</strong>
+└─ <strong class="folder">src/</strong>
+   ├─ <strong class="file">lib.rs</strong>
+   ├─ <strong class="file">foo.rs</strong>
+   ├─ <strong class="file">bar.rs</strong>
+   └─ <strong class="folder">bar/</strong>
+      └─ <strong class="file">baz.rs</strong></code></pre>
+</div>
+</div>
+<div class="openblock flex">
+<div class="content">
+<div class="listingblock">
+<div class="title">lib.rs</div>
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="c1">// root module</span>
+
+<span class="k">pub</span> <span class="k">mod</span> <span class="n">foo</span><span class="p">;</span>
+<span class="k">pub</span> <span class="k">mod</span> <span class="n">bar</span><span class="p">;</span></code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="title">bar.rs</div>
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">pub</span> <span class="k">mod</span> <span class="n">baz</span><span class="p">;</span>
+
+<span class="k">pub</span> <span class="k">use</span> <span class="nn">baz</span><span class="p">::</span><span class="o">*</span><span class="p">;</span>
+<span class="k">pub</span> <span class="k">use</span> <span class="k">crate</span><span class="p">::</span><span class="nn">foo</span><span class="p">::</span><span class="n">Answer</span><span class="p">;</span></code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="title">foo.rs</div>
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">mod</span> <span class="n">answer</span> <span class="p">{</span>
+    <span class="k">pub</span> <span class="k">struct</span> <span class="nf">Answer</span><span class="p">(</span><span class="k">pub</span> <span class="nb">i32</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">pub</span> <span class="k">use</span> <span class="nn">answer</span><span class="p">::</span><span class="n">Answer</span><span class="p">;</span></code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="title">baz.rs</div>
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">use</span> <span class="k">super</span><span class="p">::</span><span class="n">Answer</span><span class="p">;</span>
+
+<span class="k">pub</span> <span class="k">fn</span> <span class="nf">answer</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="n">Answer</span> <span class="p">{</span>
+    <span class="nf">Answer</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>No worries if you don&#8217;t understand everything here! All the concepts that are used here will be explained. You can look at this example later and see if you understand everything. For now, do you know what the module tree is?</p>
+</div>
+<details><summary>See solution</summary>
+<div class="listingblock file-tree">
+<div class="content">
+<pre class="rouge highlight"><code>└─ <strong class="folder">library root</strong>  /src/lib.rs
+   ├─ <strong class="file">foo</strong>        /src/foo.rs
+   │  └─ <strong class="file">answer</strong>  /src/foo.rs
+   └─ <strong class="file">bar</strong>        /src/bar.rs
+      └─ <strong class="file">baz</strong>     /src/bar/baz.rs</code></pre>
+</div>
+</div>
+</details>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="items-and-paths">Items and paths</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>A module contains <em>items</em>. Items are</p>
+</div>
+<div class="ulist compact">
+<ul>
+<li>
+<p>Functions</p>
+</li>
+<li>
+<p>Types (structs, enums, unions, type aliases)</p>
+</li>
+<li>
+<p>Traits</p>
+</li>
+<li>
+<p>Impl blocks</p>
+</li>
+<li>
+<p>Macros</p>
+</li>
+<li>
+<p>Constants and statics</p>
+</li>
+<li>
+<p>Extern blocks</p>
+</li>
+<li>
+<p>Extern crates</p>
+</li>
+<li>
+<p>Imports</p>
+</li>
+<li>
+<p>Modules</p>
+</li>
+<li>
+<p>Associated items (not important right now)</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>You can refer to items by their <em>path</em>. For example, the path <code>foo::bar::Baz</code> refers to the <code>Baz</code> item within the <code>bar</code> item within the <code>foo</code> item. Paths are usually relative: To use <code>foo::bar::Baz</code>, the <code>foo</code> item must be available in the current scope; absolute paths (starting at the root module) are prefixed with <code>crate::</code>. A <code>super::</code> path segment changes to the parent module (similar to <code>../</code> in the file system).</p>
+</div>
+<div class="paragraph">
+<p><em>Imports</em> are used to shorten paths. Instead of having to write <code>foo::bar::Baz</code> every time, we can write <code>use foo::bar::Baz;</code> once. This brings the item into scope, so we can refer to it with the much shorter path <code>Baz</code>.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="title">Changes to paths in the 2018 edition</div>
+<div class="paragraph">
+<p>Prior to the 2018 edition, absolute paths started with just <code>::</code> instead of <code>crate::</code>. In the 2018 edition, this syntax is still available, but it&#8217;s not recommended and can only be used for external crates.</p>
+</div>
+<div class="paragraph">
+<p>In the 2015 edition, imports were always absolute, even when they weren&#8217;t prefixed with <code>::</code>. This was fixed in the 2018 edition for more consistency.</p>
+</div>
+<div class="paragraph">
+<p>The 2018 edition also changed how external crates are used: In the 2015 edition, to use an external crate, an <code>extern crate</code> declaration was needed. This is no longer required in most cases: We can just put dependencies in our <code>Cargo.toml</code>, and use them right away.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="visibility">Visibility</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><em>Visibility</em>, or <em>privacy</em>, is the concept of making parts of a module inaccessible from other modules. Things that are only accessible in the same module are called <em>private</em>, and things that are accessible everywhere are called <em>public</em>.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>This concept exists in many programming languages. However, in most object-oriented languages, the privacy boundary is the <em>class</em>, whereas in Rust, the modules are privacy boundaries.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>In Rust, most things are private by default. To make something public, the <code>pub</code> keyword is written before it. This makes the item accessible everywhere:</p>
+</div>
+<div class="listingblock">
+<div class="title">lib.rs</div>
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">mod</span> <span class="n">foo</span> <span class="p">{</span>  <i class="conum" data-value="1"></i><b>(1)</b>
+    <span class="k">pub</span> <span class="k">mod</span> <span class="n">bar</span> <span class="p">{</span>
+        <span class="k">struct</span> <span class="n">Baz</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="c1">// use bar::Baz;  </span><i class="conum" data-value="2"></i><b>(2)</b>
+<span class="p">}</span>
+
+<span class="k">use</span> <span class="nn">foo</span><span class="p">::</span><span class="n">bar</span><span class="p">;</span>  <i class="conum" data-value="3"></i><b>(3)</b></code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>This declares a private module, so it can only be used within this root module. It can&#8217;t be accessed from another crate.</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>If we uncommented this, it would fail to compile. <code>Baz</code> is private, therefore it can only be used within the <code>bar</code> module.</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The module <code>bar</code> can be used here, because it is declared as public. This is somewhat counter-intuitive, since the <code>foo</code> module is private. But when a module is private, it can still be accessed within its direct parent module, since a module is just like any other item.</td>
+</tr>
+</table>
+</div>
+<div class="sect2">
+<h3 id="encapsulation">Encapsulation</h3>
+<div class="paragraph">
+<p>When designing an API, there are often <em>invariants</em> that need to be preserved. An invariant is a property that never changes. For example, a struct might contain a value that is supposed to always be within the interval [0; 360):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">pub</span> <span class="k">struct</span> <span class="nf">Angle</span><span class="p">(</span><span class="k">pub</span> <span class="nb">f32</span><span class="p">);</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Let&#8217;s write a <code>new</code> function that validates this invariant, and a getter for the value:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span> <span class="n">Angle</span> <span class="p">{</span>
+    <span class="k">pub</span> <span class="k">fn</span> <span class="nf">new</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="nb">f32</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="k">Self</span> <span class="p">{</span>
+        <span class="nf">Angle</span><span class="p">(</span><span class="n">value</span><span class="nf">.rem_euclid</span><span class="p">(</span><span class="mf">360.0</span><span class="p">))</span> <i class="conum" data-value="1"></i><b>(1)</b>
+    <span class="p">}</span>
+
+    <span class="k">pub</span> <span class="k">fn</span> <span class="nf">value</span><span class="p">(</span><span class="o">&amp;</span><span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">f32</span> <span class="p">{</span>
+        <span class="k">self</span><span class="na">.0</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td><a href="https://doc.rust-lang.org/std/primitive.f32.html#method.rem_euclid"><code>rem_euclid</code></a> calculates the least nonnegative remainder of <code>self (mod rhs)</code>.</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>By ensuring that the angle is always in [0; 360), we can implement operations such as equality (where 0° == 360°) very easily. But wait! Since the field is public, a user of the API can create an <code>Angle</code> object without calling the <code>new</code> function, or modify it without checking the invariant.</p>
+</div>
+<div class="paragraph">
+<p>By making the field private, the struct&#8217;s implementation details are hidden. This is called <em>encapsulation</em>: Within this module, we still have to take special care that the invariant is preserved, but if the code is correct, the public API is impossible to use incorrectly.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="fine-grained-visibility">Fine-grained visibility</h3>
+<div class="paragraph">
+<p>Items can be private or public. However, there are also visibilities in-between: Most notably, an item can be declared as <code>pub(crate)</code>. This means that it is visible <em>within the current crate</em>, but not outside. With <code>pub(super)</code>, an item is visible within the parent module. With <code>pub(in <em class="no-yellow">path</em>)</code>, visibility can also be limited to any other module as well:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">pub</span><span class="p">(</span><span class="k">crate</span><span class="p">)</span> <span class="k">mod</span> <span class="n">foo</span> <span class="p">{</span>
+    <span class="k">pub</span><span class="p">(</span><span class="k">super</span><span class="p">)</span> <span class="k">fn</span> <span class="nf">bar</span><span class="p">()</span> <span class="p">{}</span>
+    <span class="k">pub</span><span class="p">(</span><span class="n">in</span> <span class="k">crate</span><span class="p">::</span><span class="n">foo</span><span class="p">)</span> <span class="k">struct</span> <span class="n">Baz</span><span class="p">;</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>When something is visible in one module, it is also visible in all its child modules. It still needs to be imported (or referred to with its path) though:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">struct</span> <span class="n">Foo</span><span class="p">;</span>
+<span class="c1">// Foo is visible in this module</span>
+
+<span class="k">mod</span> <span class="n">inner</span> <span class="p">{</span>
+    <span class="k">use</span> <span class="k">super</span><span class="p">::</span><span class="n">Foo</span><span class="p">;</span>
+    <span class="c1">// Foo is also visible here!</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="visibilities-overview">Visibilities overview</h3>
+<div class="openblock min-width">
+<div class="content">
+<table class="tableblock frame-all grid-all fit-content fancy">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>pub</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The item is visible everywhere</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>pub(crate)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The item is visible in the current crate</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>pub(super)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The item is visible in the parent module</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>pub(in&nbsp;some::path)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The item is visible in the specified path. The path must refer to an ancestor module of the item.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>pub(self)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The item is private, i.e. visible only in the same module. This is equivalent to omitting the visibility entirely.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="exports">Exports</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>With <code>pub use</code> declarations, items can be <em>re-exported</em> from a different module than the one they were declared in. A re-exported item has multiple paths that refer to the same thing. For example:</p>
+</div>
+<div class="listingblock">
+<div class="title">lib.rs</div>
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">pub</span> <span class="k">mod</span> <span class="n">answer</span> <span class="p">{</span>
+    <span class="k">pub</span> <span class="k">const</span> <span class="n">ANSWER</span><span class="p">:</span> <span class="nb">i32</span> <span class="o">=</span> <span class="mi">42</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="k">pub</span> <span class="k">use</span> <span class="nn">answer</span><span class="p">::</span><span class="n">ANSWER</span><span class="p">;</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now <code>ANSWER</code> can be referred to as either <code>crate::ANSWER</code> or <code>crate​::answer::ANSWER</code>. However, not every path is always reachable. Take, for example:</p>
+</div>
+<div class="listingblock">
+<div class="title">lib.rs</div>
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">mod</span> <span class="n">answer</span> <span class="p">{</span>
+    <span class="k">pub</span> <span class="k">const</span> <span class="n">ANSWER</span><span class="p">:</span> <span class="nb">i32</span> <span class="o">=</span> <span class="mi">42</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="k">pub</span> <span class="k">use</span> <span class="nn">answer</span><span class="p">::</span><span class="n">ANSWER</span><span class="p">;</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><code>crate​::answer::ANSWER</code> is public, but it can&#8217;t be used from outside the crate, because the <code>answer</code> module is private. Only the re-export <code>crate::ANSWER</code> can be used from outside the crate.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="common-pitfalls">Common pitfalls</h2>
+<div class="sectionbody">
+<div class="dlist">
+<dl>
+<dt class="hdlist1">The module tree must be built manually.</dt>
+<dd>
+<p>There&#8217;s no implicit mapping from the <em>file system tree</em> to the <em>module tree</em>: We need to declare all modules with the <code>mod</code> keyword.</p>
+</dd>
+<dt class="hdlist1">Don&#8217;t confuse <em>visibility</em> with <em>reachability</em>.</dt>
+<dd>
+<p>The visibility of an item is like an <em>upper bound</em>, it can&#8217;t be increased with re-exports. For example, we can&#8217;t re-export a private struct outside of its module.</p>
+<div class="paragraph">
+<p>However, a public item might not be reachable from outside the crate, if it&#8217;s in a private module and isn&#8217;t publicly re-exported. To make an item available in the crate root, it&#8217;s not enough to make it public; we also need to make it reachable from the crate root.</p>
+</div>
+</dd>
+<dt class="hdlist1">Don&#8217;t confuse <em>visibility</em> with <em>availability</em>.</dt>
+<dd>
+<p>Visibility means that we are principally allowed to use an item somewhere. It doesn&#8217;t mean that the item is available, i.e. <em>in scope</em>, so we might still have to import it (or refer to it with its path).</p>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="special-cases">Special cases</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>There are a few language constructs that don&#8217;t adhere to the same rules as everything else:</p>
+</div>
+<div class="sect2">
+<h3 id="enum-variants-and-fields">Enum variants and fields</h3>
+<div class="paragraph">
+<p>Enum variants and variant fields are always public, and it&#8217;s not possible to make them private. Therefore we should be careful when exposing enums publicly, because changing the variants or fields later is not backwards compatible.</p>
+</div>
+<div class="paragraph">
+<p>You can add the <a href="https://doc.rust-lang.org/nightly/reference/attributes/type_system.html#the-non_exhaustive-attribute"><code>#[non_exhaustive]</code></a> attribute to an enum to allow adding more variants later. This mean that the enum can&#8217;t be matched exhaustively; we&#8217;ll always need to add a wildcard match arm (<code>_ =&gt; {}</code>).</p>
+</div>
+<div class="paragraph">
+<p>Sometimes it&#8217;s a good idea to wrap an enum in a struct to hide the implementation details:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">pub</span> <span class="k">struct</span> <span class="nf">Foo</span><span class="p">(</span><span class="n">FooImpl</span><span class="p">);</span> <span class="c1">// FooImpl is private</span>
+
+<span class="k">enum</span> <span class="n">FooImpl</span> <span class="p">{</span>
+    <span class="c1">// ...</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Also, when an enum variant has multiple fields, it&#8217;s usually better to put them in a separate struct, so it&#8217;s possible to make the fields private or make the struct <code>non_exhaustive</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="c1">// Instead of this:</span>
+<span class="k">pub</span> <span class="k">enum</span> <span class="n">Foo</span> <span class="p">{</span>
+    <span class="n">Variant</span> <span class="p">{</span>
+        <span class="n">field</span><span class="p">:</span> <span class="nb">i32</span><span class="p">,</span>
+        <span class="n">other_field</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// do this:</span>
+<span class="k">pub</span> <span class="k">enum</span> <span class="n">Foo</span> <span class="p">{</span>
+    <span class="nf">Variant</span><span class="p">(</span><span class="n">FooVariant</span><span class="p">),</span>
+<span class="p">}</span>
+<span class="k">pub</span> <span class="k">struct</span> <span class="n">FooVariant</span> <span class="p">{</span>
+    <span class="n">field</span><span class="p">:</span> <span class="nb">i32</span><span class="p">,</span>
+    <span class="n">other_field</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="macros">Macros</h3>
+<div class="paragraph">
+<p>Declarative macros (the ones that are declared with <code>macro_rules!</code>) behave more like local variables within a function than like items in some regards. For example, they can be shadowed, they have to be declared before they can be used, and they don&#8217;t need to be explicitly imported in child modules <sup class="footnote">[<a id="_footnoteref_2" class="footnote" href="#_footnotedef_2" title="View footnote.">2</a>]</sup>.</p>
+</div>
+<div class="paragraph">
+<p>And, they can&#8217;t be declared public. The <code>#[macro_export]</code> attribute can be added to a macro, which exports it publicly at the crate root. This can be undesirable, however, if it&#8217;s not supposed to be part of the public API; there is no equivalent of <code>pub(crate)</code> for macros.</p>
+</div>
+<div class="paragraph">
+<p>One workaround for this is to put our macros in a module and annotate the module with <code>#[macro_use]</code>. The module should be the <em>first module declaration</em> in the crate root. This ensures that the macros can be used everywhere in our crate, but not outside of the crate. Not the most elegant solution, but it works.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="why-are-modules-declared-explicitly">Why are modules declared explicitly?</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>I promised to explain why modules have to be declared explicitly. There are a few reasons:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>With the <a href="https://doc.rust-lang.org/reference/items/modules.html#the-path-attribute"><code>#[path]</code></a> attribute, a module can be located in a different directory, or have a different name than the file.</p>
+</li>
+<li>
+<p>Module declarations can have a visibility, e.g. <code>pub(crate) mod foo;</code></p>
+</li>
+<li>
+<p>Sometimes there are files which you don&#8217;t want to include in the module tree.</p>
+<div class="paragraph">
+<p>For example, a crate with both a library and a binary target usually contains a <code>lib.rs</code> file for the library and a <code>main.rs</code> file for the binary. Submodules are stored in the same directory, but some modules are only needed by the library, and some only by the binary. By specifying the modules explicitly, you can include only the necessary modules in each file.</p>
+</div>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="fin">Fin</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>I hope you liked this post! Please let me know if you found this article useful; were there any things that were unclear or confusing? I&#8217;ll try to improve it over time.</p>
+</div>
+<div class="paragraph">
+<p>Discussion on <a href="https://www.reddit.com/r/rust/comments/mf2you/rusts_module_system_explained/">Reddit</a>. You can also open an issue in the <a href="https://github.com/Aloso/aloso.github.io/issues">issue tracker</a>.</p>
+</div>
+<div class="paragraph">
+<p>Until next time!</p>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<hr>
+<div class="footnote" id="_footnotedef_1">
+<a href="#_footnoteref_1">1</a>. A crate can also have multiple targets (library, binary, example, test, and benchmark targets), in which case each target has its own root. You can read more about this <a href="https://doc.rust-lang.org/cargo/reference/cargo-targets.html">here</a>.
+</div>
+<div class="footnote" id="_footnotedef_2">
+<a href="#_footnoteref_2">2</a>. This is called &#8220;textual scoping&#8221;. Actually, macros can have both a textual scope (like local variables) and a path-based scope (like items); the rules for this are <a href="https://doc.rust-lang.org/reference/macros-by-example.html#scoping-exporting-and-importing">quite complicated</a>.
+</div>
+</div>
+        </div>
+    </div>
+    <div id="footer">
+    <div id="footer-inner">
+        &copy; Ludwig Stecher
+        <span class="bullet"></span>
+        <a href="https://github.com/Aloso">GitHub</a>
+        <span class="bullet"></span>
+        <a href="https://github.com/Aloso/aloso.github.io/">Found a typo?</a>
+        <span class="bullet"></span>
+        <a href="/feed.xml">Atom feed</a>
+
+        <div id="license">
+            This work is licensed under a <a href="https://creativecommons.org/licenses/by/4.0/">Creative Commons
+                Attribution 4.0 International</a> License.
+        </div>
+    </div>
+</div>
+<script>
+    console.log('Font Awesome Free 5.15.3 by @fontawesome - https://fontawesome.com\nLicense - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License)\n');
+</script>
+
+
+    
+    <script>
+        for (const heading of document.querySelectorAll('h1,h2,h3,h4,h5,h6')) {
+            const id = heading.id;
+            if (typeof id === 'string' && id !== '') {
+                const elem = document.createElement('a');
+                elem.className = 'anchor';
+                elem.href = '#' + id;
+                heading.prepend(elem);
+            } else if (heading.nodeName === 'H1' && heading.previousElementSibling == null) {
+                const elem = document.createElement('a');
+                elem.className = 'anchor';
+                elem.href = '#';
+                heading.prepend(elem);
+            }
+        }
+    </script>
+    
+</body>
+</html>

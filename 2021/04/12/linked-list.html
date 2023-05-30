@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Nunito+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+        rel="stylesheet">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/layout.css?t=1685419102">
+    <title>A zero-overhead linked list in Rust</title>
+
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/fav/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/fav/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/fav/favicon-16x16.png">
+    <link rel="manifest" href="/assets/fav/site.webmanifest?t=1685419102">
+    <link rel="mask-icon" href="/assets/fav/safari-pinned-tab.svg" color="#f88e00">
+    <link rel="shortcut icon" href="/assets/fav/favicon.ico">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-config" content="/assets/fav/browserconfig.xml?t=1685419102">
+    <meta name="theme-color" content="#ffffff">
+</head>
+
+<body>
+    <div id="nav">
+    <div id="nav-inner">
+        
+            
+
+            
+                <a id="home" href="/">Aloso's blog</a>
+            
+        
+            
+
+            
+                <a href="/about">About</a>
+            
+        
+    </div>
+</div>
+
+    <div id="main">
+        <div id="main-inner">
+            <h1>A zero-overhead linked list in Rust</h1>
+            
+            <div id="meta">
+                
+                    <span class="tag">Tutorial</span>
+                
+                12 Apr 2021
+                <span class="bullet"></span>
+                21 minutes read
+            </div>
+            
+
+            
+            <div id="toc">
+                <div id="toc-title">Table of Contents</div>
+                <ul class="sectlevel1">
+<li><a href="#implementation">Implementation</a></li>
+<li><a href="#persistent-data-structures">Persistent data structures</a></li>
+<li><a href="#writing-an-iterator">Writing an iterator</a></li>
+<li><a href="#internal-iteration">Internal iteration</a></li>
+<li><a href="#limitations">Limitations</a></li>
+<li><a href="#use-case">Use case</a></li>
+<li><a href="#alternatives">Alternatives</a></li>
+<li><a href="#fin">Fin</a></li>
+</ul>
+            </div>
+            
+
+            <div class="paragraph">
+<p>Let&#8217;s implement an immutable, singly-linked list. <em>Singly-linked</em> means that each node contains a reference to the next node, but not vice versa. To make this data structure really performant, let&#8217;s use plain references instead of heap-allocated types. This would be dangerous in memory-unsafe languages like C, because it could easily cause vulnerabilities because of dangling pointers, but Rust&#8217;s lifetimes protect us from this. We&#8217;ll see what this means in a moment.</p>
+</div>
+<div class="sect1">
+<h2 id="implementation">Implementation</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The implementation is fairly simple:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">pub</span> <span class="k">enum</span> <span class="n">List</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="n">Node</span> <span class="p">{</span>
+        <span class="n">data</span><span class="p">:</span> <span class="n">T</span><span class="p">,</span>
+        <span class="n">next</span><span class="p">:</span> <span class="o">&amp;</span><span class="nv">'a</span> <span class="n">List</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">Tail</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>So a list is either a node containing some data and a reference to the next node, or the <em>tail</em>, i.e. the end of the list. Let&#8217;s write a <code>Default</code> implementation that creates an empty list, which is just <code>List::Tail</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span> <span class="nb">Default</span> <span class="k">for</span> <span class="n">List</span><span class="o">&lt;</span><span class="nv">'_</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">fn</span> <span class="nf">default</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="k">Self</span> <span class="p">{</span>
+        <span class="nn">List</span><span class="p">::</span><span class="n">Tail</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now how do we add elements to the list? As I mentioned above, this list is <em>immutable</em>, so altering a list is not possible. Instead, let&#8217;s introduce a concept from functional programming: Persistent data structures</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="persistent-data-structures">Persistent data structures</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>According to <a href="https://en.wikipedia.org/wiki/Persistent_data_structure">wikipedia</a>:</p>
+</div>
+<div class="quoteblock">
+<blockquote>
+<div class="paragraph">
+<p>A persistent data structure is a data structure that always preserves the previous version of itself when it is modified. Such data structures are effectively immutable, as their operations do not (visibly) update the structure in-place, but instead always yield a new updated structure.</p>
+</div>
+</blockquote>
+</div>
+<div class="paragraph">
+<p>We can achieve this by prepending a node at the front of the list: The previous list stays the same, but we get a new node pointing to it.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span> <span class="n">List</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">pub</span> <span class="k">fn</span> <span class="nf">add</span><span class="p">(</span><span class="o">&amp;</span><span class="nv">'a</span> <span class="k">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">T</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="k">Self</span> <span class="p">{</span>
+        <span class="nn">List</span><span class="p">::</span><span class="n">Node</span> <span class="p">{</span> <span class="n">data</span><span class="p">,</span> <span class="n">next</span><span class="p">:</span> <span class="k">self</span> <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Let&#8217;s try it out:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="nd">#[test]</span>
+<span class="k">fn</span> <span class="nf">test_add</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">tail</span> <span class="o">=</span> <span class="nn">List</span><span class="p">::</span><span class="n">Tail</span><span class="p">;</span>
+    <span class="k">let</span> <span class="n">first</span> <span class="o">=</span> <span class="n">tail</span><span class="nf">.add</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">second</span> <span class="o">=</span> <span class="n">first</span><span class="nf">.add</span><span class="p">(</span><span class="mi">10</span><span class="p">);</span>
+
+    <span class="nd">assert_eq!</span><span class="p">(</span><span class="n">tail</span><span class="p">,</span> <span class="nn">List</span><span class="p">::</span><span class="n">Tail</span><span class="p">);</span>
+    <span class="nd">assert_eq!</span><span class="p">(</span><span class="n">first</span><span class="p">,</span> <span class="nn">List</span><span class="p">::</span><span class="n">Node</span> <span class="p">{</span>
+        <span class="n">data</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+        <span class="n">next</span><span class="p">:</span> <span class="o">&amp;</span><span class="nn">List</span><span class="p">::</span><span class="n">Tail</span><span class="p">,</span>
+    <span class="p">});</span>
+    <span class="nd">assert_eq!</span><span class="p">(</span><span class="n">second</span><span class="p">,</span> <span class="nn">List</span><span class="p">::</span><span class="n">Node</span> <span class="p">{</span>
+        <span class="n">data</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="n">next</span><span class="p">:</span> <span class="o">&amp;</span><span class="nn">List</span><span class="p">::</span><span class="n">Node</span> <span class="p">{</span>
+            <span class="n">data</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+            <span class="n">next</span><span class="p">:</span> <span class="o">&amp;</span><span class="nn">List</span><span class="p">::</span><span class="n">Tail</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">});</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>For this to work, we need to implement <code>Debug</code> and <code>PartialEq</code> for our type. While we&#8217;re at it, let&#8217;s also implement some other useful traits. Note that we can even implement <code>Copy</code>, since <code>next</code> is just a reference, not a <code>Box</code> or <code>Rc</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="nd">#[derive(Debug,</span> <span class="nd">Clone,</span> <span class="nd">Copy,</span> <span class="nd">PartialEq,</span> <span class="nd">Eq,</span> <span class="nd">PartialOrd,</span> <span class="nd">Ord)]</span>
+<span class="k">pub</span> <span class="k">enum</span> <span class="n">List</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="c1">// snip</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>That&#8217;s it! Now we can test it:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="sh"><span class="o">&gt;</span> cargo <span class="nb">test</span> <span class="nt">-q</span>
+
+running 1 <span class="nb">test</span>
+<strong class="green">.</strong>
+<span class="nb">test </span>result: <strong class="green">ok</strong>. 1 passed<span class="p">;</span> 0 failed<span class="p">;</span> 0 ignored<span class="p">;</span> 0 measured<span class="p">;</span> 0 filtered out<span class="p">;</span> finished <span class="k">in </span>0.00s</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="writing-an-iterator">Writing an iterator</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>In a functional language, we&#8217;d use this data structure mainly in recursive functions. It is, after all, a recursive data structure. But since this is Rust, let&#8217;s implement an <a href="https://doc.rust-lang.org/std/iter/trait.Iterator.html"><code>Iterator</code></a> for our type:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">pub</span> <span class="k">struct</span> <span class="n">ListIter</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span><span class="p">(</span><span class="o">&amp;</span><span class="nv">'a</span> <span class="n">List</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span><span class="p">);</span>
+
+<span class="k">impl</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span> <span class="nb">Iterator</span> <span class="k">for</span> <span class="n">ListIter</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">type</span> <span class="n">Item</span> <span class="o">=</span> <span class="o">&amp;</span><span class="nv">'a</span> <span class="n">T</span><span class="p">;</span>
+
+    <span class="k">fn</span> <span class="nf">next</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="k">Self</span><span class="p">::</span><span class="n">Item</span><span class="o">&gt;</span> <span class="p">{</span>
+        <span class="k">match</span> <span class="k">self</span><span class="na">.0</span> <span class="p">{</span>
+            <span class="nn">List</span><span class="p">::</span><span class="n">Node</span> <span class="p">{</span> <span class="n">data</span><span class="p">,</span> <span class="n">next</span> <span class="p">}</span> <span class="k">=&gt;</span> <span class="p">{</span>
+                <span class="k">self</span><span class="na">.0</span> <span class="o">=</span> <span class="n">next</span><span class="p">;</span>
+                <span class="nf">Some</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="p">}</span>
+            <span class="nn">List</span><span class="p">::</span><span class="n">Tail</span> <span class="k">=&gt;</span> <span class="nb">None</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>This is a by-reference iterator. Writing an iterator that owns the element is not possible. This is a fundamental limitation of this list type, since the nodes are behind shared references.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>We can also implement <code>IntoIterator</code> to make iterating over a <code>List</code> easier:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span> <span class="nb">IntoIterator</span> <span class="k">for</span> <span class="o">&amp;</span><span class="nv">'a</span> <span class="n">List</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">type</span> <span class="n">Item</span> <span class="o">=</span> <span class="o">&amp;</span><span class="nv">'a</span> <span class="n">T</span><span class="p">;</span>
+
+    <span class="k">type</span> <span class="n">IntoIter</span> <span class="o">=</span> <span class="n">ListIter</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span><span class="p">;</span>
+
+    <span class="k">fn</span> <span class="nf">into_iter</span><span class="p">(</span><span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="k">Self</span><span class="p">::</span><span class="n">IntoIter</span> <span class="p">{</span>
+        <span class="nf">ListIter</span><span class="p">(</span><span class="k">self</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Let&#8217;s test this as well:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="nd">#[test]</span>
+<span class="k">fn</span> <span class="nf">test_iterator</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">tail</span> <span class="o">=</span> <span class="nn">List</span><span class="p">::</span><span class="n">Tail</span><span class="p">;</span>
+    <span class="k">let</span> <span class="n">first</span> <span class="o">=</span> <span class="n">tail</span><span class="nf">.add</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">second</span> <span class="o">=</span> <span class="n">first</span><span class="nf">.add</span><span class="p">(</span><span class="mi">10</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">values</span><span class="p">:</span> <span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">i32</span><span class="o">&gt;</span> <span class="o">=</span>
+        <span class="n">second</span><span class="nf">.into_iter</span><span class="p">()</span><span class="nf">.copied</span><span class="p">()</span><span class="nf">.collect</span><span class="p">();</span>
+
+    <span class="nd">assert_eq!</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="nd">vec!</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">]);</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>But wait! Why are the values in the opposite order of how we added them? That&#8217;s because the <code>add</code> function prepends nodes at the start of the list. We can think of it like a stack of books: We can put books on top of it, and we can take books from it, but only in the opposite order.</p>
+</div>
+<div class="paragraph">
+<p>Can&#8217;t we just use <code>.rev()</code> to iterate in reverse direction? Let&#8217;s try it:</p>
+</div>
+<div class="listingblock compile-error">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">let</span> <span class="n">values</span><span class="p">:</span> <span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">i32</span><span class="o">&gt;</span> <span class="o">=</span>
+    <span class="n">second</span><span class="nf">.into_iter</span><span class="p">()</span><span class="nf">.rev</span><span class="p">()</span><span class="nf">.copied</span><span class="p">()</span><span class="nf">.collect</span><span class="p">();</span></code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code><strong class="red">error[E0277]</strong>: the trait bound <code>ListIter&lt;'_, {integer}&gt;: DoubleEndedIterator</code> is not satisfied
+  --&gt; src/lib.rs:78:28
+   |
+78 |     second.into_iter().rev().copied().collect();
+   |                        <span class="red">^^^ the trait <code>DoubleEndedIterator</code> is not implemented for <code>ListIter&lt;'_, {integer}&gt;</code></span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>So it doesn&#8217;t work. To make it work, we&#8217;d have to implement the <code>DoubleEndedIterator</code> trait, but that can&#8217;t be done very efficiently, because a list node can&#8217;t access its previous node. Then let&#8217;s try a different approach!</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="internal-iteration">Internal iteration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Iterating over the list in reverse order can be done efficiently, if we use a <em>recursive algorithm</em>. This doesn&#8217;t work with the design of <code>Iterator</code> trait, so we&#8217;ll just implement it as an <em>internal iterator</em>, i.e. a function that accepts a closure:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span> <span class="n">List</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="c1">// snip</span>
+
+    <span class="k">pub</span> <span class="k">fn</span> <span class="nf">rev_iter</span><span class="p">(</span><span class="o">&amp;</span><span class="nv">'a</span> <span class="k">self</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="k">impl</span> <span class="nf">Fn</span><span class="p">(</span><span class="o">&amp;</span><span class="nv">'a</span> <span class="n">T</span><span class="p">))</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="k">let</span> <span class="nn">List</span><span class="p">::</span><span class="n">Node</span> <span class="p">{</span> <span class="n">data</span><span class="p">,</span> <span class="n">next</span> <span class="p">}</span> <span class="o">=</span> <span class="k">self</span> <span class="p">{</span>
+            <span class="n">next</span><span class="nf">.rev_iter</span><span class="p">(</span><span class="o">&amp;</span><span class="n">f</span><span class="p">);</span> <i class="conum" data-value="1"></i><b>(1)</b>
+            <span class="nf">f</span><span class="p">(</span><span class="n">data</span><span class="p">);</span> <i class="conum" data-value="2"></i><b>(2)</b>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>We call <code>rev_iter</code> recursively.</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>Because we want to iterate in reverse, we call the closure <em>after</em> the recursive function call.</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>This has the downside that we can&#8217;t use iterator combinators like <code>filter</code> or <code>map</code>. It also doesn&#8217;t allow error handling in the closure, but we can add one more internal iterator that stops iterating when the closure returns an error:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">impl</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span> <span class="n">List</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="n">T</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="c1">// snip</span>
+
+    <span class="k">pub</span> <span class="k">fn</span> <span class="n">try_rev_iter</span><span class="o">&lt;</span><span class="n">E</span><span class="p">,</span> <span class="n">F</span><span class="o">&gt;</span><span class="p">(</span><span class="o">&amp;</span><span class="nv">'a</span> <span class="k">self</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">F</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span> <span class="n">E</span><span class="o">&gt;</span>
+    <span class="k">where</span>
+        <span class="n">F</span><span class="p">:</span> <span class="nf">Fn</span><span class="p">(</span><span class="o">&amp;</span><span class="nv">'a</span> <span class="n">T</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span> <span class="n">E</span><span class="o">&gt;</span><span class="p">,</span>
+    <span class="p">{</span>
+        <span class="k">if</span> <span class="k">let</span> <span class="nn">List</span><span class="p">::</span><span class="n">Node</span> <span class="p">{</span> <span class="n">data</span><span class="p">,</span> <span class="n">next</span> <span class="p">}</span> <span class="o">=</span> <span class="k">self</span> <span class="p">{</span>
+            <span class="n">next</span><span class="nf">.try_rev_iter</span><span class="p">(</span><span class="o">&amp;</span><span class="n">f</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+            <span class="nf">f</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+        <span class="p">}</span>
+        <span class="nf">Ok</span><span class="p">(())</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>I&#8217;m omitting the test here, but you can read it in the <a href="https://play.rust-lang.org/?version=stable&amp;mode=debug&amp;edition=2018&amp;gist=fbd969411281665b92a9884cd8d8bbbb">playground</a>, or you can implement it as an exercise.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="limitations">Limitations</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>This type of list isn&#8217;t useful very often. One reason for this is that it can only be iterated over by-reference. The other reason I&#8217;ll demonstrate now. Let&#8217;s try to create a function that constructs a <code>List</code> and returns it:</p>
+</div>
+<div class="listingblock compile-error">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">fn</span> <span class="n">too_bad</span><span class="o">&lt;</span><span class="nv">'a</span><span class="o">&gt;</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="n">List</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="nb">i32</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">tail</span> <span class="o">=</span> <span class="nn">List</span><span class="p">::</span><span class="n">Tail</span><span class="p">;</span>
+    <span class="k">let</span> <span class="n">v1</span> <span class="o">=</span> <span class="n">tail</span><span class="nf">.add</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">v2</span> <span class="o">=</span> <span class="n">v1</span><span class="nf">.add</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
+    <span class="n">v2</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code><strong class="red">error[E0515]</strong>: cannot return value referencing local variable <code>tail</code>
+   --&gt; src/lib.rs:107:5
+    |
+105 |     let v1 = tail.add(1);
+    |              <span class="blue">---- <code>tail</code> is borrowed here</span>
+106 |     let v2 = v1.add(2);
+107 |     v2
+    |     <span class="red">^^ returns a value referencing data owned by the current function</span>
+
+<strong class="red">error[E0515]</strong>: cannot return value referencing local variable <code>v1</code>
+   --&gt; src/lib.rs:107:5
+    |
+106 |     let v2 = v1.add(2);
+    |              <span class="blue">-- <code>v1</code> is borrowed here</span>
+107 |     v2
+    |     <span class="red">^^ returns a value referencing data owned by the current function</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>So this doesn&#8217;t work. We can&#8217;t return a list if it was created in the current function. How about a function that adds elements to a list in-place?</p>
+</div>
+<div class="listingblock compile-error">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">fn</span> <span class="n">doesnt_work</span><span class="o">&lt;</span><span class="nv">'a</span><span class="o">&gt;</span><span class="p">(</span><span class="n">list</span><span class="p">:</span> <span class="o">&amp;</span><span class="nv">'a</span> <span class="k">mut</span> <span class="n">List</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="nb">i32</span><span class="o">&gt;</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">old_list</span> <span class="o">=</span> <span class="nn">std</span><span class="p">::</span><span class="nn">mem</span><span class="p">::</span><span class="nf">take</span><span class="p">(</span><span class="n">list</span><span class="p">);</span>
+    <span class="o">*</span><span class="n">list</span> <span class="o">=</span> <span class="n">old_list</span><span class="nf">.add</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code><strong class="red">error[E0597]</strong>: <code>old_list</code> does not live long enough
+   --&gt; src/lib.rs:112:13
+    |
+110 | fn doesnt_work&lt;'a&gt;(list: &amp;'a mut List&lt;'a, i32&gt;) {
+    |                <span class="blue">-- lifetime <code>'a</code> defined here</span>
+111 |     let old_list = std::mem::take(list);
+112 |     *list = old_list.add(5);
+    |             <span class="red">^^^^^^^^</span><span class="blue">-------</span>
+    |             <span class="blue">|</span>
+    |             <span class="red">borrowed value does not live long enough</span>
+    |             <span class="blue">argument requires that <code>old_list</code> is borrowed for <code>'a</code></span>
+113 | }
+    | <span class="blue">- <code>old_list</code> dropped here while still borrowed</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>That doesn&#8217;t work either. This probably doesn&#8217;t come as a surprise if you&#8217;re familiar with Rust&#8217;s ownership rules: When we return a list, it can&#8217;t borrow anything defined in the current function. If Rust didn&#8217;t prevent this, we could accidentally get a <em>dangling reference</em>.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="title">What&#8217;s a dangling reference?</div>
+<div class="paragraph">
+<p>All local variables live on the <em>stack</em>. Let&#8217;s use the analogy of a pile of books again: When a function is called, a new book is placed on the stack, and when the function exits, the book is removed. A dangling reference is a reference into a book that has already been removed from the stack. However, if a different book is then put in its place, its memory is overwritten, so the reference becomes invalid. Luckily for us, Rust&#8217;s borrow checker prevents references from becoming dangling.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="use-case">Use case</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>So when is this type useful? When you need to efficiently add nodes to a list without modifying the original list, and the limitations above are not a problem.</p>
+</div>
+<div class="paragraph">
+<p>One example that comes to mind is an interpreter for a stack-based programming language. Here&#8217;s a simple example:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="nd">#[derive(Clone,</span> <span class="nd">PartialEq)]</span>
+<span class="k">pub</span> <span class="k">enum</span> <span class="n">Value</span> <span class="p">{</span>
+    <span class="nf">Num</span><span class="p">(</span><span class="nb">f64</span><span class="p">),</span>
+    <span class="nf">Bool</span><span class="p">(</span><span class="nb">bool</span><span class="p">),</span>
+    <span class="nf">String</span><span class="p">(</span><span class="nb">String</span><span class="p">),</span>
+<span class="p">}</span>
+
+<span class="k">pub</span> <span class="k">enum</span> <span class="n">Expr</span> <span class="p">{</span>
+    <span class="nf">Value</span><span class="p">(</span><span class="n">Value</span><span class="p">),</span>
+    <span class="nf">Variable</span><span class="p">(</span><span class="nb">String</span><span class="p">),</span>
+    <span class="nf">UnExpr</span><span class="p">(</span><span class="n">UnExprKind</span><span class="p">,</span> <span class="nb">Box</span><span class="o">&lt;</span><span class="n">Expr</span><span class="o">&gt;</span><span class="p">),</span>
+    <span class="nf">BinExpr</span><span class="p">(</span><span class="n">BinExprKind</span><span class="p">,</span> <span class="nb">Box</span><span class="o">&lt;</span><span class="p">(</span><span class="n">Expr</span><span class="p">,</span> <span class="n">Expr</span><span class="p">)</span><span class="o">&gt;</span><span class="p">),</span>
+    <span class="nf">Define</span><span class="p">(</span><span class="nb">String</span><span class="p">,</span> <span class="nb">Box</span><span class="o">&lt;</span><span class="p">(</span><span class="n">Expr</span><span class="p">,</span> <span class="n">Expr</span><span class="p">)</span><span class="o">&gt;</span><span class="p">),</span>
+    <span class="nf">IfThenElse</span><span class="p">(</span><span class="nb">Box</span><span class="o">&lt;</span><span class="p">(</span><span class="n">Expr</span><span class="p">,</span> <span class="n">Expr</span><span class="p">,</span> <span class="n">Expr</span><span class="p">)</span><span class="o">&gt;</span><span class="p">),</span>
+<span class="p">}</span>
+
+<span class="k">pub</span> <span class="k">enum</span> <span class="n">UnExprKind</span> <span class="p">{</span>
+    <span class="n">Not</span><span class="p">,</span>
+    <span class="nb">Neg</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="nd">#[derive(PartialEq)]</span>
+<span class="k">pub</span> <span class="k">enum</span> <span class="n">BinExprKind</span> <span class="p">{</span>
+    <span class="c1">// Arithmetic</span>
+    <span class="nb">Add</span><span class="p">,</span>
+    <span class="nb">Sub</span><span class="p">,</span>
+    <span class="nb">Mul</span><span class="p">,</span>
+    <span class="nb">Div</span><span class="p">,</span>
+
+    <span class="c1">// Logic</span>
+    <span class="n">And</span><span class="p">,</span>
+    <span class="n">Or</span><span class="p">,</span>
+    <span class="n">Equals</span><span class="p">,</span>
+    <span class="n">NotEquals</span><span class="p">,</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This programming language has three data types, numbers, booleans and strings. Numbers support basic arithmetic operations (<code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>), booleans support logic operations (<code>&amp;&amp;</code>, <code>||</code>, <code>!</code>, <code>==</code>, <code>!=</code>). Operations are divided into <em>unary</em> operations (those with only one operand) and <em>binary</em> operations (those with two operands).</p>
+</div>
+<div class="paragraph">
+<p>The programming language is expression-based, so everything is an expresssion. An expression can be a value, a variable, a unary or binary operation, a variable definition, or a condition. Note that a variable definition always introduces a new scope in which the defined variable can be used. The syntax could look something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code><span class="k">define</span> x = <span class="mi">5</span> <span class="k">in</span>
+    some_expression</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This defines a variable <code>x</code>, which can be used in <code>some_expression</code>. The only way to define multiple variables is to nest them:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code><span class="k">define</span> x = <span class="mi">5</span> <span class="k">in</span>
+    <span class="k">define</span> y = <span class="mi">42</span> <span class="k">in</span>
+        x <span class="nf">+</span> y</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now let&#8217;s implement the function that evaluates this language:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">type</span> <span class="n">Variables</span><span class="o">&lt;</span><span class="nv">'a</span><span class="o">&gt;</span> <span class="o">=</span> <span class="n">List</span><span class="o">&lt;</span><span class="nv">'a</span><span class="p">,</span> <span class="p">(</span><span class="nb">String</span><span class="p">,</span> <span class="n">Value</span><span class="p">)</span><span class="o">&gt;</span><span class="p">;</span>
+
+<span class="k">pub</span> <span class="k">fn</span> <span class="nf">eval</span><span class="p">(</span>
+    <span class="n">vars</span><span class="p">:</span> <span class="o">&amp;</span><span class="n">Variables</span><span class="o">&lt;</span><span class="nv">'_</span><span class="o">&gt;</span><span class="p">,</span>
+    <span class="n">expr</span><span class="p">:</span> <span class="n">Expr</span><span class="p">,</span>
+<span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="n">Value</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">match</span> <span class="n">expr</span> <span class="p">{</span>
+        <span class="nn">Expr</span><span class="p">::</span><span class="nf">Value</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="nf">Some</span><span class="p">(</span><span class="n">val</span><span class="p">),</span>
+
+        <span class="nn">Expr</span><span class="p">::</span><span class="nf">Variable</span><span class="p">(</span><span class="n">var</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="n">vars</span>  <i class="conum" data-value="1"></i><b>(1)</b>
+            <span class="nf">.into_iter</span><span class="p">()</span>
+            <span class="nf">.find</span><span class="p">(|</span><span class="o">&amp;</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">_</span><span class="p">)|</span> <span class="o">*</span><span class="n">v</span> <span class="o">==</span> <span class="n">var</span><span class="p">)</span>
+            <span class="nf">.map</span><span class="p">(|(</span><span class="n">_</span><span class="p">,</span> <span class="n">val</span><span class="p">)|</span> <span class="n">val</span><span class="nf">.clone</span><span class="p">()),</span>
+
+        <span class="nn">Expr</span><span class="p">::</span><span class="nf">UnExpr</span><span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="n">expr</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+            <span class="nf">eval_unary</span><span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="n">vars</span><span class="p">,</span> <span class="o">*</span><span class="n">expr</span><span class="p">)</span>
+        <span class="p">}</span>
+
+        <span class="nn">Expr</span><span class="p">::</span><span class="nf">BinExpr</span><span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="n">exprs</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+            <span class="nf">eval_binary</span><span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="n">vars</span><span class="p">,</span> <span class="n">exprs</span><span class="na">.0</span><span class="p">,</span> <span class="n">exprs</span><span class="na">.1</span><span class="p">)</span>
+        <span class="p">}</span>
+
+        <span class="nn">Expr</span><span class="p">::</span><span class="nf">Define</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">exprs</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+            <span class="k">let</span> <span class="n">value</span> <span class="o">=</span> <span class="nf">eval</span><span class="p">(</span><span class="n">vars</span><span class="p">,</span> <span class="n">exprs</span><span class="na">.0</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+            <span class="k">let</span> <span class="n">vars</span> <span class="o">=</span> <span class="n">vars</span><span class="nf">.add</span><span class="p">((</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">));</span>  <i class="conum" data-value="2"></i><b>(2)</b>
+            <span class="nf">eval</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vars</span><span class="p">,</span> <span class="n">exprs</span><span class="na">.1</span><span class="p">)</span>
+        <span class="p">}</span>
+
+        <span class="nn">Expr</span><span class="p">::</span><span class="nf">IfThenElse</span><span class="p">(</span><span class="n">exprs</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+            <span class="k">if</span> <span class="k">let</span> <span class="nn">Value</span><span class="p">::</span><span class="nf">Bool</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">=</span> <span class="nf">eval</span><span class="p">(</span><span class="n">vars</span><span class="p">,</span> <span class="n">exprs</span><span class="na">.0</span><span class="p">)</span><span class="o">?</span> <span class="p">{</span>
+                <span class="nf">eval</span><span class="p">(</span><span class="n">vars</span><span class="p">,</span> <span class="k">if</span> <span class="n">b</span> <span class="p">{</span> <span class="n">exprs</span><span class="na">.1</span> <span class="p">}</span> <span class="k">else</span> <span class="p">{</span> <span class="n">exprs</span><span class="na">.2</span> <span class="p">})</span>
+            <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+                <span class="nb">None</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">fn</span> <span class="nf">eval_unary</span><span class="p">(</span>
+    <span class="n">kind</span><span class="p">:</span> <span class="n">UnExprKind</span><span class="p">,</span>
+    <span class="n">vars</span><span class="p">:</span> <span class="o">&amp;</span><span class="n">Variables</span><span class="o">&lt;</span><span class="nv">'_</span><span class="o">&gt;</span><span class="p">,</span>
+    <span class="n">expr</span><span class="p">:</span> <span class="n">Expr</span><span class="p">,</span>
+<span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="n">Value</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">match</span> <span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="nf">eval</span><span class="p">(</span><span class="n">vars</span><span class="p">,</span> <span class="n">expr</span><span class="p">)</span><span class="o">?</span><span class="p">)</span> <span class="p">{</span>
+        <span class="p">(</span><span class="nn">UnExprKind</span><span class="p">::</span><span class="n">Not</span><span class="p">,</span> <span class="nn">Value</span><span class="p">::</span><span class="nf">Bool</span><span class="p">(</span><span class="n">b</span><span class="p">))</span> <span class="k">=&gt;</span> <span class="p">{</span>
+            <span class="nf">Some</span><span class="p">(</span><span class="nn">Value</span><span class="p">::</span><span class="nf">Bool</span><span class="p">(</span><span class="o">!</span><span class="n">b</span><span class="p">))</span>
+        <span class="p">}</span>
+        <span class="p">(</span><span class="nn">UnExprKind</span><span class="p">::</span><span class="nb">Neg</span><span class="p">,</span> <span class="nn">Value</span><span class="p">::</span><span class="nf">Num</span><span class="p">(</span><span class="n">n</span><span class="p">))</span> <span class="k">=&gt;</span> <span class="p">{</span>
+            <span class="nf">Some</span><span class="p">(</span><span class="nn">Value</span><span class="p">::</span><span class="nf">Num</span><span class="p">(</span><span class="o">-</span><span class="n">n</span><span class="p">))</span>
+        <span class="p">}</span>
+        <span class="n">_</span> <span class="k">=&gt;</span> <span class="nb">None</span><span class="p">,</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">fn</span> <span class="nf">eval_binary</span><span class="p">(</span>
+    <span class="n">kind</span><span class="p">:</span> <span class="n">BinExprKind</span><span class="p">,</span>
+    <span class="n">vars</span><span class="p">:</span> <span class="o">&amp;</span><span class="n">Variables</span><span class="o">&lt;</span><span class="nv">'_</span><span class="o">&gt;</span><span class="p">,</span>
+    <span class="n">lhs</span><span class="p">:</span> <span class="n">Expr</span><span class="p">,</span>
+    <span class="n">rhs</span><span class="p">:</span> <span class="n">Expr</span><span class="p">,</span>
+<span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="n">Value</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">match</span> <span class="n">kind</span> <span class="p">{</span>
+        <span class="nn">BinExprKind</span><span class="p">::</span><span class="nb">Add</span> <span class="k">=&gt;</span> <span class="p">{</span>
+            <span class="k">if</span> <span class="k">let</span> <span class="nn">Value</span><span class="p">::</span><span class="nf">Num</span><span class="p">(</span><span class="n">lhs</span><span class="p">)</span> <span class="o">=</span> <span class="nf">eval</span><span class="p">(</span><span class="n">vars</span><span class="p">,</span> <span class="n">lhs</span><span class="p">)</span><span class="o">?</span> <span class="p">{</span>
+                <span class="k">if</span> <span class="k">let</span> <span class="nn">Value</span><span class="p">::</span><span class="nf">Num</span><span class="p">(</span><span class="n">rhs</span><span class="p">)</span> <span class="o">=</span> <span class="nf">eval</span><span class="p">(</span><span class="n">vars</span><span class="p">,</span> <span class="n">rhs</span><span class="p">)</span><span class="o">?</span> <span class="p">{</span>
+                    <span class="k">return</span> <span class="nf">Some</span><span class="p">(</span><span class="nn">Value</span><span class="p">::</span><span class="nf">Num</span><span class="p">(</span><span class="n">lhs</span> <span class="o">+</span> <span class="n">rhs</span><span class="p">));</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+            <span class="nb">None</span>
+        <span class="p">}</span>
+        <span class="c1">// remaining match arms omitted</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>Look up the variable with the name <code>var</code>.</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>Add a new variable to the list</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The full code, including tests, is in the <a href="https://play.rust-lang.org/?version=stable&amp;mode=debug&amp;edition=2018&amp;gist=fbd969411281665b92a9884cd8d8bbbb">playground</a>.</p>
+</div>
+<div class="paragraph">
+<p>Why is a linked list better than a <code>Vec</code> in this case? Because a variable should only be visible in its own scope, so when evaluating a variable definition, the list of variables should be the same afterwards as before.</p>
+</div>
+<div class="paragraph">
+<p>One way to achieve this with a <code>Vec</code> is to clone it whenever a new variable is added, but this is quite inefficient.</p>
+</div>
+<div class="paragraph">
+<p>An alternative is to add the variable to the <code>Vec</code> and remove it again when the variable&#8217;s scope ends. The problem with this is that it requires passing a mutable <code>Vec</code> around, so the type system can&#8217;t ensure that the <code>Vec</code>'s previous state is restored after a variable definition. A small error or even an early return could break it. This could be prevented with a <a href="https://aloso.github.io/2021/03/18/raii-guards.html">RAII guard</a>, but the solution using <code>List</code> is more elegant.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="alternatives">Alternatives</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To get around the lifetime issues, you can use reference-counted smart pointers (<a href="https://doc.rust-lang.org/std/rc/struct.Rc.html"><code>Rc</code></a> or <a href="https://doc.rust-lang.org/std/sync/struct.Arc.html"><code>Arc</code></a>):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">enum</span> <span class="n">List</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="n">Node</span> <span class="p">{</span>
+        <span class="n">data</span><span class="p">:</span> <span class="n">T</span><span class="p">,</span>
+        <span class="n">next</span><span class="p">:</span> <span class="nb">Arc</span><span class="o">&lt;</span><span class="n">List</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;&gt;</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">Tail</span><span class="p">,</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This has all the advantages of our type, except that <code>Rc</code> and <code>Arc</code> incur a slight performance overhead when creating, cloning or dropping it.</p>
+</div>
+<div class="paragraph">
+<p>When you don&#8217;t need the list to be persistent or immutable, you can just use a <code>Vec</code> instead. This also has some overhead due to heap allocations, but in return has better cache locality. More importantly, it&#8217;s easier to use: Keeping your code maintainable and easy to read is usually more important than to squeeze out every last drop of performance. Heavy optimization is only needed in performance-critical sections of the code.</p>
+</div>
+<div class="paragraph">
+<p>The often-cited quote &#8220;Premature optimization is the root of all evil&#8221; doesn&#8217;t mean that you shouldn&#8217;t optimize, rather that you should be clever about it. Do the most effective things to improve performance first: Choose efficient algorithms. Then benchmark your code, identify where it spends most of its time, try to optimize these parts, and verify that your optimizations actually yield an improvement. Trying to optimize code without measuring the results is a hopeless endeavor.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="fin">Fin</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>I&#8217;m looking forward to the discussion on <a href="https://www.reddit.com/r/rust/comments/mpncp6/a_zerooverhead_linked_list_in_rust/">Reddit</a>. You can also open an issue in the <a href="https://github.com/Aloso/aloso.github.io/issues">issue tracker</a>. Until next time!</p>
+</div>
+</div>
+</div>
+        </div>
+    </div>
+    <div id="footer">
+    <div id="footer-inner">
+        &copy; Ludwig Stecher
+        <span class="bullet"></span>
+        <a href="https://github.com/Aloso">GitHub</a>
+        <span class="bullet"></span>
+        <a href="https://github.com/Aloso/aloso.github.io/">Found a typo?</a>
+        <span class="bullet"></span>
+        <a href="/feed.xml">Atom feed</a>
+
+        <div id="license">
+            This work is licensed under a <a href="https://creativecommons.org/licenses/by/4.0/">Creative Commons
+                Attribution 4.0 International</a> License.
+        </div>
+    </div>
+</div>
+<script>
+    console.log('Font Awesome Free 5.15.3 by @fontawesome - https://fontawesome.com\nLicense - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License)\n');
+</script>
+
+
+    
+    <script>
+        for (const heading of document.querySelectorAll('h1,h2,h3,h4,h5,h6')) {
+            const id = heading.id;
+            if (typeof id === 'string' && id !== '') {
+                const elem = document.createElement('a');
+                elem.className = 'anchor';
+                elem.href = '#' + id;
+                heading.prepend(elem);
+            } else if (heading.nodeName === 'H1' && heading.previousElementSibling == null) {
+                const elem = document.createElement('a');
+                elem.className = 'anchor';
+                elem.href = '#';
+                heading.prepend(elem);
+            }
+        }
+    </script>
+    
+</body>
+</html>

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Nunito+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+        rel="stylesheet">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/layout.css?t=1685419102">
+    <title>Implementing RAII guards in Rust</title>
+
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/fav/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/fav/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/fav/favicon-16x16.png">
+    <link rel="manifest" href="/assets/fav/site.webmanifest?t=1685419102">
+    <link rel="mask-icon" href="/assets/fav/safari-pinned-tab.svg" color="#f88e00">
+    <link rel="shortcut icon" href="/assets/fav/favicon.ico">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-config" content="/assets/fav/browserconfig.xml?t=1685419102">
+    <meta name="theme-color" content="#ffffff">
+</head>
+
+<body>
+    <div id="nav">
+    <div id="nav-inner">
+        
+            
+
+            
+                <a id="home" href="/">Aloso's blog</a>
+            
+        
+            
+
+            
+                <a href="/about">About</a>
+            
+        
+    </div>
+</div>
+
+    <div id="main">
+        <div id="main-inner">
+            <h1>Implementing RAII guards in Rust</h1>
+            
+            <div id="meta">
+                
+                    <span class="tag">Tutorial</span>
+                
+                18 Mar 2021
+                <span class="bullet"></span>
+                12 minutes read
+            </div>
+            
+
+            
+            <div id="toc">
+                <div id="toc-title">Table of Contents</div>
+                <ul class="sectlevel1">
+<li><a href="#where-is-drop-being-used">Where is <code>Drop</code> being used?</a></li>
+<li><a href="#raii">RAII</a></li>
+<li><a href="#raii-guards">RAII guards</a></li>
+<li><a href="#implementation">Implementation</a></li>
+<li><a href="#test-it">Test it</a></li>
+<li><a href="#when-drop-isnt-called">When <code>Drop</code> isn&#8217;t called</a></li>
+<li><a href="#fin">Fin</a></li>
+</ul>
+            </div>
+            
+
+            <div class="paragraph">
+<p>As you probably know, Rust doesn&#8217;t have automatic garbage collection. Instead, it relies on destructors to clean up memory, and these destructor calls are automatically inserted in the appropriate places at compile time. And since Rust uses traits for everything, destructors use a trait as well: The <a href="https://doc.rust-lang.org/std/ops/trait.Drop.html"><code>Drop</code></a> trait.</p>
+</div>
+<div class="paragraph">
+<p>This has the benefit that <code>Drop</code> can be implemented to do anything, not just cleaning up memory: It can also release a file descriptor, close a network socket, cancel an in-flight HTTP request, and much more. Whenever you acquire some sort of resource, and want to release it when you&#8217;re done with it, the <code>Drop</code> trait is your friend.</p>
+</div>
+<div class="paragraph">
+<p>In this blog post we&#8217;ll first look at how the <code>Drop</code> trait works, and then implement the RAII guard pattern, step by step.</p>
+</div>
+<div class="sect1">
+<h2 id="where-is-drop-being-used">Where is <code>Drop</code> being used?</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The most common example are heap-allocated containers, such as <code>Box</code>, <code>Vec</code> and <code>String</code>. When such a value goes out of scope, it gets <em>dropped</em>, which means that its <code>Drop</code> implementation is called:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">fn</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">s</span> <span class="o">=</span> <span class="s">"hello, world!!"</span><span class="nf">.to_string</span><span class="p">();</span> <i class="conum" data-value="1"></i><b>(1)</b>
+    <span class="nf">do_something</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="n">s</span><span class="p">);</span>
+<span class="p">}</span> <i class="conum" data-value="2"></i><b>(2)</b></code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>String is allocated on the heap</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td><code>s</code> is dropped, heap allocation is freed</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Another use case are containers that provide <em>interior mutability</em>, such as <a href="https://doc.rust-lang.org/std/cell/struct.RefCell.html"><code>RefCell</code></a> or <a href="https://doc.rust-lang.org/std/sync/struct.Mutex.html"><code>Mutex</code></a>. Before we can mutate one of these types, we have to aquire a <em>write lock</em>. Once the write lock is released, it can be aquired again. It is guaranteed that there is at most one write lock at any time, to prevent data races <sup class="footnote">[<a id="_footnoteref_1" class="footnote" href="#_footnotedef_1" title="View footnote.">1</a>]</sup>.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="title">Data races</div>
+<div class="paragraph">
+<p>A race condition is a situation where multiple <em>actors</em> (threads, processes, coroutines, etc.) can access a <em>shared resource</em> at the same time without <em>synchronisation</em>. This may cause <em>data races</em>, which means that the actors influence each other, yielding erroneous results. <code>Mutex</code> provides synchronisation by ensuring that while it&#8217;s mutated by an actor, other actors can&#8217;t access it.</p>
+</div>
+<div class="paragraph">
+<p>For comparison, imagine two cars approaching an intersection from different directions. If the cars enter the intersection at the same time, they crash into one another. The cars are actors, the intersection is a shared resource, and the car crash is a data race. Crashes can be prevented with proper synchronisation, e.g. traffic lights.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="raii">RAII</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>RAII stands for “resource acquisition is initialisation”, which is not a very helpful name; it&#8217;s a design pattern and means that every resource is managed by an object; when the object is created, the resource is acquired, and when the object is destroyed, the resource is released. This is what happens in the example above with the <code>String</code>: When <code>s</code> is created, a chunk of memory is acquired. When <code>s</code> is dropped, the memory is released again.</p>
+</div>
+<div class="paragraph">
+<p>However, sometimes it&#8217;s useful to have a type that doesn&#8217;t acquire a resource immediately, and can still be used after the resource has been released. Also, sometimes we want to acquire and release a resource multiple times in a row. That&#8217;s where <em>RAII guards</em> come in.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="raii-guards">RAII guards</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>RAII guards is a design pattern for managing a resource when RAII as described above is not flexible enough. It uses <em>two types</em> instead of one: The first one contains a resource (or has a way of acquiring it), but doesn&#8217;t allow us to access the resource directly. It does however have a method for creating an object of the second type. The second type is a <em>RAII guard</em>: It allows us to access the resource, until the RAII guard is dropped.</p>
+</div>
+<div class="paragraph">
+<p>One example of the RAII guards pattern is <code>RefCell</code>. To mutate a <code>RefCell</code>, we have to call its <code>borrow_mut</code> method. This returns a write lock, which is a RAII guard:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">cell</span><span class="p">::</span><span class="n">RefCell</span><span class="p">;</span>
+
+<span class="k">fn</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">ref_cell</span> <span class="o">=</span> <span class="nn">RefCell</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="mi">7</span><span class="p">);</span>
+    <span class="p">{</span>
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">guard</span> <span class="o">=</span> <span class="n">ref_cell</span><span class="nf">.borrow_mut</span><span class="p">();</span> <i class="conum" data-value="1"></i><b>(1)</b>
+        <span class="o">*</span><span class="n">guard</span> <span class="o">*=</span> <span class="mi">6</span><span class="p">;</span>
+    <span class="p">}</span> <i class="conum" data-value="2"></i><b>(2)</b>
+    <span class="nd">dbg!</span><span class="p">(</span><span class="n">ref_cell</span><span class="p">);</span>
+<span class="p">}</span> <i class="conum" data-value="3"></i><b>(3)</b></code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The RAII guard is created, which borrows the <code>RefCell</code> and acquires a write lock.</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The RAII guard is dropped, which releases the write lock.</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The <code>RefCell</code> is dropped.</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="implementation">Implementation</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Let&#8217;s implement a museum. People can come in and admire the exhibits:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">pub</span> <span class="k">struct</span> <span class="n">Museum</span><span class="p">;</span>
+
+<span class="k">impl</span> <span class="n">Museum</span> <span class="p">{</span>
+    <span class="k">pub</span> <span class="k">fn</span> <span class="nf">admire_exhibits</span><span class="p">(</span><span class="o">&amp;</span><span class="k">self</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nd">println!</span><span class="p">(</span><span class="s">"How amazing!"</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now because of the current pandemic, no more than 20 visitors are allowed inside at any time. To ensure this, the ticket seller has only 20 tickets. Visitors need a ticket to enter the museum, and when they exit, they have to give it back.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">pub</span> <span class="k">struct</span> <span class="n">Museum</span> <span class="p">{</span>
+    <span class="n">remaining_tickets</span><span class="p">:</span> <span class="nb">u32</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">impl</span> <span class="n">Museum</span> <span class="p">{</span>
+    <span class="k">pub</span> <span class="k">fn</span> <span class="nf">new</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="k">Self</span> <span class="p">{</span>
+        <span class="n">Museum</span> <span class="p">{</span>
+            <span class="n">remaining_tickets</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="k">pub</span> <span class="k">fn</span> <span class="nf">get_ticket</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="n">Ticket</span><span class="o">&gt;</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="k">self</span><span class="py">.remaining_tickets</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+            <span class="k">self</span><span class="py">.remaining_tickets</span> <span class="o">-=</span> <span class="mi">1</span><span class="p">;</span>
+            <span class="nf">Some</span><span class="p">(</span><span class="nf">Ticket</span><span class="p">(()))</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="nb">None</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="k">pub</span> <span class="k">fn</span> <span class="nf">return_ticket</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="k">self</span><span class="p">,</span> <span class="n">ticket</span><span class="p">:</span> <span class="n">Ticket</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">self</span><span class="py">.remaining_tickets</span> <span class="o">+=</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">pub</span> <span class="k">struct</span> <span class="nf">Ticket</span><span class="p">(());</span>
+
+<span class="k">impl</span> <span class="n">Ticket</span> <span class="p">{</span>
+    <span class="k">pub</span> <span class="k">fn</span> <span class="nf">admire_exhibits</span><span class="p">(</span><span class="o">&amp;</span><span class="k">self</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nd">println!</span><span class="p">(</span><span class="s">"How amazing!"</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>How great! We have a <code>Museum</code> and a <code>Ticket</code> type. <code>Ticket</code> has a private field, so it can&#8217;t be created directly from the public API. To get a ticket, one has to call <code>Museum::get_ticket</code>, which ensures that no more than 20 tickets are in circulation.</p>
+</div>
+<div class="paragraph">
+<p>This design suffers from two problems, however: First, if there are multiple museums, we don&#8217;t know which ticket belongs to which museum. Although a visitor can&#8217;t teleport from one museum to another, Rust&#8217;s type system doesn&#8217;t know that, so it allows us to get a ticket from one museum and return it at a different one. This means that more visitors could be in the museum than intended, which is bad during a pandemic. This could be prevented if the tickets had the museum&#8217;s name on it, but that raises the question what to do when a wrong ticket is returned. We&#8217;d really like to avoid having to handle this type of error, if there&#8217;s an alternative.</p>
+</div>
+<div class="paragraph">
+<p>The other problem is that this design doesn&#8217;t force visitors to return their ticket when exiting the museum: If we forget to call <code>Museum::return_ticket</code>, the ticket is lost forever. Once all tickets are lost, nobody will be able to enter the museum, even though it is empty!</p>
+</div>
+<div class="paragraph">
+<p>Both problems can be solved by making <code>Ticket</code> a RAII guard, which borrows the museum:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">cell</span><span class="p">::</span><span class="n">RefCell</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">ops</span><span class="p">::</span><span class="nb">Drop</span><span class="p">;</span>
+
+<span class="k">pub</span> <span class="k">struct</span> <span class="n">Museum</span> <span class="p">{</span>
+    <span class="n">remaining_tickets</span><span class="p">:</span> <span class="n">RefCell</span><span class="o">&lt;</span><span class="nb">u32</span><span class="o">&gt;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">impl</span> <span class="n">Museum</span> <span class="p">{</span>
+    <span class="k">pub</span> <span class="k">fn</span> <span class="nf">new</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="k">Self</span> <span class="p">{</span>
+        <span class="n">Museum</span> <span class="p">{</span>
+            <span class="n">remaining_tickets</span><span class="p">:</span> <span class="nn">RefCell</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="mi">20</span><span class="p">),</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="k">pub</span> <span class="k">fn</span> <span class="nf">get_ticket</span><span class="p">(</span><span class="o">&amp;</span><span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="n">Ticket</span><span class="o">&lt;</span><span class="nv">'_</span><span class="o">&gt;&gt;</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">lock</span> <span class="o">=</span> <span class="k">self</span><span class="py">.remaining_tickets</span><span class="nf">.borrow_mut</span><span class="p">();</span>
+        <span class="k">if</span> <span class="o">*</span><span class="n">lock</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+            <span class="o">*</span><span class="n">lock</span> <span class="o">-=</span> <span class="mi">1</span><span class="p">;</span>
+            <span class="nf">Some</span><span class="p">(</span><span class="n">Ticket</span> <span class="p">{</span> <span class="n">museum</span><span class="p">:</span> <span class="k">self</span> <span class="p">})</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="nb">None</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">pub</span> <span class="k">struct</span> <span class="n">Ticket</span><span class="o">&lt;</span><span class="nv">'a</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="n">museum</span><span class="p">:</span> <span class="o">&amp;</span><span class="nv">'a</span> <span class="n">Museum</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">impl</span> <span class="n">Ticket</span><span class="o">&lt;</span><span class="nv">'_</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">pub</span> <span class="k">fn</span> <span class="nf">admire_exhibits</span><span class="p">(</span><span class="o">&amp;</span><span class="k">self</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nd">println!</span><span class="p">(</span><span class="s">"How amazing!"</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">impl</span> <span class="nb">Drop</span> <span class="k">for</span> <span class="n">Ticket</span><span class="o">&lt;</span><span class="nv">'_</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">fn</span> <span class="k">drop</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="k">self</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">lock</span> <span class="o">=</span> <span class="k">self</span><span class="py">.museum.remaining_tickets</span><span class="nf">.borrow_mut</span><span class="p">();</span>
+        <span class="o">*</span><span class="n">lock</span> <span class="o">+=</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Here&#8217;s what changed:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>Ticket</code> borrows the <code>Museum</code>, so it can&#8217;t be returned to the wrong museum.</p>
+</li>
+<li>
+<p><code>Museum::get_ticket</code> now takes <code>&amp;self</code> instead of <code>&amp;mut self</code>, because otherwise only one ticket could exist for each museum at a time.</p>
+</li>
+<li>
+<p><code>remaining_tickets</code> is wrapped in a <code>RefCell</code>, which provides interior mutability.</p>
+</li>
+<li>
+<p><code>Museum::return_ticket</code> was replaced with a <code>Drop</code> implementation for <code>Ticket</code>. This ensures that tickets are always returned.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="test-it">Test it</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>As always, it is a good idea to test the code:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="rust"><span class="nd">#[test]</span>
+<span class="k">fn</span> <span class="nf">test_museum</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">museum</span> <span class="o">=</span> <span class="nn">Museum</span><span class="p">::</span><span class="nf">new</span><span class="p">();</span>
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">tickets</span><span class="p">:</span> <span class="nb">Vec</span><span class="o">&lt;</span><span class="n">Ticket</span><span class="o">&gt;</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="o">..</span><span class="mi">20</span><span class="p">)</span>
+        <span class="nf">.map</span><span class="p">(|</span><span class="n">_</span><span class="p">|</span> <span class="n">museum</span><span class="nf">.get_ticket</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">())</span>
+        <span class="nf">.collect</span><span class="p">();</span>
+
+    <span class="k">assert</span><span class="o">!</span><span class="p">(</span><span class="n">museum</span><span class="nf">.get_ticket</span><span class="p">()</span><span class="nf">.is_none</span><span class="p">());</span>
+    <span class="n">tickets</span><span class="nf">.pop</span><span class="p">();</span>
+    <span class="n">tickets</span><span class="nf">.push</span><span class="p">(</span><span class="n">museum</span><span class="nf">.get_ticket</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">());</span>
+    <span class="nd">assert_eq!</span><span class="p">(</span><span class="o">*</span><span class="n">museum</span><span class="py">.remaining_tickets</span><span class="nf">.borrow</span><span class="p">(),</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="k">drop</span><span class="p">(</span><span class="n">tickets</span><span class="p">);</span>
+    <span class="nd">assert_eq!</span><span class="p">(</span><span class="o">*</span><span class="n">museum</span><span class="py">.remaining_tickets</span><span class="nf">.borrow</span><span class="p">(),</span> <span class="mi">20</span><span class="p">);</span>
+<span class="p">}</span></code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Note that if the test is in the same module as the code, we can inspect private fields. Now let&#8217;s run the test:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="sh"><span class="o">&gt;</span> cargo <span class="nb">test</span> <span class="nt">-q</span>
+
+running 1 <span class="nb">test</span>
+<strong class="green">.</strong>
+<span class="nb">test </span>result: <strong class="green">ok</strong>. 1 passed<span class="p">;</span> 0 failed<span class="p">;</span> 0 ignored<span class="p">;</span> 0 measured<span class="p">;</span> 0 filtered out<span class="p">;</span> finished <span class="k">in </span>0.00s</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="when-drop-isnt-called">When <code>Drop</code> isn&#8217;t called</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><code>Drop</code> implementations (called destructors) are called whenever the scope of the destructor&#8217;s object is exited. It doesn&#8217;t matter <em>how</em> the scope is exited, e.g. it could be because of a <code>return</code>, <code>continue</code> or <code>break</code> statement, a <code>?</code> expression or a panic. There&#8217;s one exception, however: When the process is exited, no destructors are run. This can be done e.g. by invoking <a href="https://doc.rust-lang.org/std/process/fn.abort.html"><code>abort</code></a>, <a href="https://doc.rust-lang.org/std/process/fn.exit.html"><code>exit</code></a>, or by panicking in a <code>Drop</code> implementation during another panic.</p>
+</div>
+<div class="paragraph">
+<p>It is also possible to <em>leak</em> objects, which means that they will never be dropped. This is usually discouraged, but allowed. Objects can be leaked e.g. with the <a href="https://doc.rust-lang.org/std/boxed/struct.Box.html#method.leak"><code>Box::leak</code></a> function, or by creating a <a href="https://doc.rust-lang.org/std/rc/">reference-counted</a> graph with a cycle. Another risk are power outages and OS crashes: For obvious reasons, values aren&#8217;t dropped in such cases either.</p>
+</div>
+<div class="paragraph">
+<p>So you can&#8217;t rely on destructors getting called. This is usually not a big problem, but something to be aware of when writing <code>Drop</code> implementations.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="fin">Fin</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Discussion on <a href="https://www.reddit.com/r/rust/comments/m7fxaz/implementing_raii_guards_in_rust/">Reddit</a>. Please <a href="https://github.com/Aloso/aloso.github.io/issues">file a bug</a> if you have questions, want some things explained in more detail, or if you found a mistake. See you around!</p>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<hr>
+<div class="footnote" id="_footnotedef_1">
+<a href="#_footnoteref_1">1</a>. <code>RefCell</code> can&#8217;t actually prevent data races, it only prevents aliasing mutable references, which would violate the ownership rules; <code>RefCell</code> is not thread-safe (it doesn&#8217;t perform locking), so Rust ensures that it can only be used in a single thread. You can use a <code>Mutex</code> or <code>RwLock</code> when you need to access the data from multiple threads.
+</div>
+</div>
+        </div>
+    </div>
+    <div id="footer">
+    <div id="footer-inner">
+        &copy; Ludwig Stecher
+        <span class="bullet"></span>
+        <a href="https://github.com/Aloso">GitHub</a>
+        <span class="bullet"></span>
+        <a href="https://github.com/Aloso/aloso.github.io/">Found a typo?</a>
+        <span class="bullet"></span>
+        <a href="/feed.xml">Atom feed</a>
+
+        <div id="license">
+            This work is licensed under a <a href="https://creativecommons.org/licenses/by/4.0/">Creative Commons
+                Attribution 4.0 International</a> License.
+        </div>
+    </div>
+</div>
+<script>
+    console.log('Font Awesome Free 5.15.3 by @fontawesome - https://fontawesome.com\nLicense - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License)\n');
+</script>
+
+
+    
+    <script>
+        for (const heading of document.querySelectorAll('h1,h2,h3,h4,h5,h6')) {
+            const id = heading.id;
+            if (typeof id === 'string' && id !== '') {
+                const elem = document.createElement('a');
+                elem.className = 'anchor';
+                elem.href = '#' + id;
+                heading.prepend(elem);
+            } else if (heading.nodeName === 'H1' && heading.previousElementSibling == null) {
+                const elem = document.createElement('a');
+                elem.className = 'anchor';
+                elem.href = '#';
+                heading.prepend(elem);
+            }
+        }
+    </script>
+    
+</body>
+</html>
