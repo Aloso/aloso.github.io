@@ -1,20 +1,12 @@
----
-layout: default
-title: Aloso's Blog
----
-{% for post in site.posts %}
-<div class="post-preview">
-    <h2 class="post-title-link">
-        <a href="{{ post.url }}">{{ post.title }}</a>
-    </h2>
-    <div class="mini-meta">
-        {% for tag in post.tags %}
-        <span class="tag">{{ tag }}</span>
-        {% endfor %}
-
-        {{ post.date | date_to_string }} <span class="bullet"></span> {{ post.content | reading_time_as_i }} read
-    </div>
-    {{ post.excerpt }}
-    <a class="continue-reading" href="{{ post.url }}">Continue reading...</a>
-</div>
-{% endfor %}
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Aloso's blog</title>
+    <link rel="canonical" href="http://aloso.foo/blog" />
+    <meta http-equiv="refresh" content="0; url=http://aloso.foo/blog" />
+  </head>
+  <body>
+    This page was moved to a new domain. <a href="http://aloso.foo/blog">Click here</a> if you
+    aren't redirected automatically.
+  </body>
+</html>
